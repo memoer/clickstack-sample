@@ -14,10 +14,13 @@ NestJS + React (Vite) + **Vanilla OpenTelemetry** + **Pino** 데모 프로젝트
 
 | Signal | Backend | Frontend | 구현 방식 |
 |--------|---------|----------|----------|
-| 📝 **Logs** | ✅ | ✅ | Pino → OTLP Log Exporter |
-| 📊 **Metrics** | ✅ | - | OpenTelemetry Metrics API |
+| 📝 **Logs** | ✅ | ✅ | Backend: Pino → OTLP / Frontend: Console capture → OTLP |
+| 📊 **Metrics** | ✅ | ✅ | OpenTelemetry Metrics API + Web Vitals (CLS, INP, LCP, TTFB, FCP) |
 | 🔍 **Traces** | ✅ | ✅ | Auto-instrumentation + 커스텀 스팬 |
-| 🎬 **Session Replay** | - | ✅ | HyperDX Browser SDK |
+| 🎬 **Session Replay** | - | ✅ | HyperDX Browser SDK (vendor-specific, 표준 없음) |
+
+> **Note**: Session Replay는 현재 표준화된 OpenTelemetry 스펙이 없어 HyperDX SDK를 사용합니다.
+> 다른 벤더로 전환 시 해당 벤더의 Session Replay SDK로 교체 필요.
 
 ## 🔄 벤더 중립성 (Vendor-neutral)
 
@@ -234,6 +237,8 @@ async function createTask(data) {
 
 ## 환경 변수
 
+### Backend
+
 | 변수 | 기본값 | 설명 |
 |-----|-------|------|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP 엔드포인트 |
@@ -243,6 +248,16 @@ async function createTask(data) {
 | `NODE_ENV` | `development` | 환경 |
 | `LOG_LEVEL` | `info` (prod) / `debug` (dev) | Pino 로그 레벨 |
 | `PORT` | `3000` | 서버 포트 |
+
+### Frontend
+
+| 변수 | 기본값 | 설명 |
+|-----|-------|------|
+| `VITE_OTEL_ENDPOINT` | `http://localhost:4318` | OTLP 엔드포인트 |
+| `VITE_SERVICE_NAME` | `clickstack-demo-frontend` | 서비스 이름 |
+| `VITE_SERVICE_VERSION` | `1.0.0` | 서비스 버전 |
+| `VITE_OTEL_API_KEY` | - | OTLP 인증 API 키 |
+| `VITE_HYPERDX_API_KEY` | (VITE_OTEL_API_KEY) | Session Replay API 키 |
 
 ## Docker Compose로 전체 실행
 

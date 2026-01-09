@@ -235,8 +235,7 @@ function App() {
           </div>
 
           <div className="info-box">
-            <h3>📊 View in ClickStack</h3>
-            <p>Open <a href="http://localhost:8080" target="_blank" rel="noopener">http://localhost:8080</a></p>
+            <h3>ClickStack</h3>
             <ul>
               <li>Search → View logs</li>
               <li>Traces → See distributed traces</li>

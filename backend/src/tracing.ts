@@ -26,7 +26,6 @@ import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
-import { exit } from "process";
 
 // Note: ATTR_DEPLOYMENT_ENVIRONMENT_NAME is in the incubating subpath export
 // which requires moduleResolution: node16+. Using string literal for compatibility.
@@ -36,22 +35,13 @@ const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
 // 환경 변수 설정
 // ============================================================================
 
-// OTLP 엔드포인트 (벤더 전환 시 이것만 변경!)
-const OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+const OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT; // OTLP 엔드포인트 (벤더 전환 시 이것만 변경!)
+const SERVICE_NAME = process.env.OTEL_SERVICE_NAME; // 서비스 정보
+const SERVICE_VERSION = process.env.SERVICE_VERSION; // 서비스 정보
+const DEPLOYMENT_ENV = process.env.NODE_ENV || "dev"; // 서비스 정보
+const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS || ""; // 인증 헤더 (선택사항 - 벤더에 따라 필요)
 
-// 서비스 정보
-const SERVICE_NAME = process.env.OTEL_SERVICE_NAME;
-const SERVICE_VERSION = process.env.SERVICE_VERSION;
-const DEPLOYMENT_ENV = process.env.NODE_ENV || "dev";
-
-// 인증 헤더 (선택사항 - 벤더에 따라 필요)
-const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS || "";
 const headers: Record<string, string> = {};
-
-if (!OTEL_EXPORTER_OTLP_ENDPOINT || !SERVICE_NAME || SERVICE_VERSION) {
-  exit(0);
-}
-
 if (AUTH_HEADER) {
   // 형식: "key1=value1,key2=value2" 또는 "Authorization=Bearer xxx"
   AUTH_HEADER.split(",").forEach(pair => {

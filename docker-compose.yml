@@ -1,0 +1,45 @@
+services:
+  # ============================================================================
+  # ClickStack (HyperDX + ClickHouse + OTel Collector)
+  # 
+  # 다른 백엔드로 전환하려면 이 서비스를 교체하세요:
+  # - Jaeger: jaegertracing/all-in-one
+  # - Grafana Tempo + Loki + Prometheus
+  # - etc.
+  # ============================================================================
+  clickstack:
+    image: docker.hyperdx.io/hyperdx/hyperdx-all-in-one
+    ports:
+      - "8080:8080"   # HyperDX UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "9000:9000"   # ClickHouse native port
+    volumes:
+      - ./data/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
+      - ./data/mongo:/data/db                    # 사용자 계정, 대시보드, 알림 설정
+      - ./data/log:/var/log                      # clickhouse, hyperdx 관련 로그
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - clickstack
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:3000
+    depends_on:
+      - backend

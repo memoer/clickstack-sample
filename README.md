@@ -337,3 +337,4 @@ Session Replay → Frontend Error → Backend Trace → Related Logs
 - [OpenTelemetry JS](https://opentelemetry.io/docs/instrumentation/js/)
 - [Pino Logger](https://github.com/pinojs/pino)
 - [ClickStack Docs](https://clickhouse.com/docs/use-cases/observability/clickstack/overview)
+# clickstack-sample

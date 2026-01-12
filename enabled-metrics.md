@@ -49,11 +49,36 @@ From `@opentelemetry/instrumentation-runtime-node`
 
 ---
 
-## 3. HTTP Metrics (Auto-Instrumentation)
+## 3. Custom HTTP Metrics
+
+Defined in `backend/src/metrics/http.metric.ts`
+
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `http.requests.total` | Counter | 1 | Total number of HTTP requests |
+| `http.active_users` | Observable Gauge | 1 | Unique active users in the last 5 minutes |
+
+### Attributes
+
+| Metric | Attributes |
+|--------|------------|
+| `http.requests.total` | `method`, `route`, `status`, `status_code` |
+| `http.active_users` | (none) |
+
+### Attribute Values
+
+| Attribute | Values |
+|-----------|--------|
+| `method` | `GET`, `POST`, `PUT`, `DELETE`, `PATCH` |
+| `route` | Route pattern (e.g., `/api/tasks/:id`) |
+| `status` | `success` (status < 400), `error` (status >= 400) |
+| `status_code` | HTTP status code as string (`200`, `404`, `500`, etc.) |
+
+---
+
+## 4. HTTP Metrics (Auto-Instrumentation)
 
 From `@opentelemetry/instrumentation-http` (included in auto-instrumentations-node)
-
-> Note: HTTP metrics require explicit opt-in. Currently using default config which primarily provides traces.
 
 | Metric Name | Type | Unit | Description | Status |
 |-------------|------|------|-------------|--------|
@@ -129,6 +154,56 @@ SELECT
   avg(Value) as active_tasks
 FROM otel_metrics_sum  -- UpDownCounter uses sum table
 WHERE MetricName = 'tasks.active.count'
+GROUP BY time
+ORDER BY time
+```
+
+### HTTP Requests by Endpoint
+
+```sql
+SELECT
+  Attributes['route'] as endpoint,
+  Attributes['method'] as method,
+  sum(Value) as total_requests
+FROM otel_metrics_sum
+WHERE MetricName = 'http.requests.total'
+GROUP BY endpoint, method
+ORDER BY total_requests DESC
+```
+
+### HTTP Success/Error Rate
+
+```sql
+SELECT
+  toStartOfMinute(TimeUnix) as time,
+  Attributes['status'] as status,
+  sum(Value) as count
+FROM otel_metrics_sum
+WHERE MetricName = 'http.requests.total'
+GROUP BY time, status
+ORDER BY time
+```
+
+### HTTP Error Rate Percentage
+
+```sql
+SELECT
+  toStartOfMinute(TimeUnix) as time,
+  100.0 * sumIf(Value, Attributes['status'] = 'error') / sum(Value) as error_rate
+FROM otel_metrics_sum
+WHERE MetricName = 'http.requests.total'
+GROUP BY time
+ORDER BY time
+```
+
+### Active Users Over Time
+
+```sql
+SELECT
+  toStartOfMinute(TimeUnix) as time,
+  avg(Value) as active_users
+FROM otel_metrics_gauge
+WHERE MetricName = 'http.active_users'
 GROUP BY time
 ORDER BY time
 ```

@@ -1,10 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Logger } from "../logger";
-import {
-  activeTasksGauge,
-  taskOperationsCounter,
-  recordMetrics,
-} from "./tasks.metric";
 
 export interface Task {
   id: string;
@@ -20,12 +15,9 @@ export class TasksService {
   private readonly tasks = new Map<string, Task>();
 
   async getAllTasks(): Promise<Task[]> {
-    const startTime = Date.now();
     await this.simulateLatency(50, 150);
 
     const tasks = Array.from(this.tasks.values());
-
-    recordMetrics("getAll", startTime);
 
     return tasks;
   }
@@ -46,7 +38,6 @@ export class TasksService {
     title: string;
     description: string;
   }): Promise<Task> {
-    const startTime = Date.now();
     await this.simulateLatency(100, 200);
 
     const task: Task = {
@@ -58,35 +49,25 @@ export class TasksService {
     };
 
     this.tasks.set(task.id, task);
-    activeTasksGauge.add(1);
-
-    recordMetrics("create", startTime);
 
     return task;
   }
 
   async updateTask(id: string, data: Partial<Task>): Promise<Task> {
-    const startTime = Date.now();
     await this.simulateLatency(80, 150);
 
     const task = this.findTaskOrThrow(id, "update");
     const updatedTask = { ...task, ...data };
     this.tasks.set(id, updatedTask);
 
-    recordMetrics("update", startTime);
-
     return updatedTask;
   }
 
   async deleteTask(id: string): Promise<void> {
-    const startTime = Date.now();
     await this.simulateLatency(50, 100);
 
     this.findTaskOrThrow(id, "delete");
     this.tasks.delete(id);
-    activeTasksGauge.add(-1);
-
-    recordMetrics("delete", startTime);
   }
 
   async simulateSlowOperation(): Promise<{ message: string }> {
@@ -111,7 +92,6 @@ export class TasksService {
       return task;
     }
 
-    taskOperationsCounter.add(1, { operation, status: "not_found" });
     this.logger.warn({ taskId: id }, `Task not found for ${operation}`);
     throw new NotFoundException(`Task with ID ${id} not found`);
   }

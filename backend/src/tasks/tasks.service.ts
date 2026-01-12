@@ -51,7 +51,7 @@ export class TasksService {
     await this.simulateLatency(100, 200);
 
     const task: Task = {
-      id: this.generateId(),
+      id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: data.title,
       description: data.description,
       completed: false,
@@ -96,6 +96,12 @@ export class TasksService {
     this.logger.info({ taskId: id }, "Task deleted");
   }
 
+  async simulateSlowOperation(): Promise<{ message: string }> {
+    await this.simulateLatency(3_000, 2_000);
+
+    return { message: "Slow operation completed" };
+  }
+
   async simulateError(): Promise<never> {
     const errorType = Math.random() > 0.5 ? "database" : "validation";
     throw new Error(`Simulated ${errorType} error for testing observability`);
@@ -108,17 +114,13 @@ export class TasksService {
   private findTaskOrThrow(id: string, operation: string): Task {
     const task = this.tasks.get(id);
 
-    if (!task) {
-      taskOperationsCounter.add(1, { operation, status: "not_found" });
-      this.logger.warn({ taskId: id }, `Task not found for ${operation}`);
-      throw new NotFoundException(`Task with ID ${id} not found`);
+    if (task) {
+      return task;
     }
 
-    return task;
-  }
-
-  private generateId(): string {
-    return `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    taskOperationsCounter.add(1, { operation, status: "not_found" });
+    this.logger.warn({ taskId: id }, `Task not found for ${operation}`);
+    throw new NotFoundException(`Task with ID ${id} not found`);
   }
 
   private simulateLatency(min: number, max: number): Promise<void> {

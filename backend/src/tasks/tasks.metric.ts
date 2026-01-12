@@ -29,12 +29,6 @@ export const activeTasksGauge = meter.createUpDownCounter(
   }
 );
 
-// Counter: 에러 수
-export const taskErrorsCounter = meter.createCounter("tasks.errors.total", {
-  description: "Total number of task operation errors",
-  unit: "1",
-});
-
 // ==========================================================================
 // Hepler Functions
 // ==========================================================================

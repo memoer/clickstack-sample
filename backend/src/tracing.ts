@@ -21,6 +21,7 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { RuntimeNodeInstrumentation } from "@opentelemetry/instrumentation-runtime-node";
 import { Resource } from "@opentelemetry/resources";
 import {
   ATTR_SERVICE_NAME,
@@ -38,7 +39,7 @@ const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
 const OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT; // OTLP 엔드포인트 (벤더 전환 시 이것만 변경!)
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME; // 서비스 정보
 const SERVICE_VERSION = process.env.SERVICE_VERSION; // 서비스 정보
-const DEPLOYMENT_ENV = process.env.NODE_ENV || "dev"; // 서비스 정보
+const DEPLOYMENT_ENV = process.env.NODE_ENV; // 서비스 정보
 const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS || ""; // 인증 헤더 (선택사항 - 벤더에 따라 필요)
 
 const headers: Record<string, string> = {};
@@ -96,7 +97,14 @@ const sdk = new NodeSDK({
   }),
 
   // Log Processor
-  logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
+  logRecordProcessors: [
+    new BatchLogRecordProcessor(logExporter, {
+      maxExportBatchSize: 512, // logs per batch
+      scheduledDelayMillis: 5000, // flush interval (ms)
+      exportTimeoutMillis: 30000, // export timeout (ms)
+      maxQueueSize: 2048, // max buffered before dropping
+    }),
+  ],
 
   // Auto Instrumentations
   instrumentations: [
@@ -105,8 +113,30 @@ const sdk = new NodeSDK({
       "@opentelemetry/instrumentation-pino": {
         logHook: (span, record) => {
           record["resource.service.name"] = SERVICE_NAME;
+          record["resource.service.version"] = SERVICE_VERSION;
+          record["resource.service.env"] = DEPLOYMENT_ENV;
         },
       },
+      // PostgreSQL (pg) - enhanced tracing
+      "@opentelemetry/instrumentation-pg": {
+        enhancedDatabaseReporting: true, // include db.statement with sanitized params
+        addSqlCommenterCommentToQueries: true, // add trace context to SQL comments
+      },
+      // Redis (ioredis) - capture commands
+      "@opentelemetry/instrumentation-ioredis": {
+        dbStatementSerializer: (cmdName, cmdArgs) => {
+          // Serialize command for span attribute (redact sensitive values if needed)
+          return `${cmdName} ${cmdArgs.map(arg => (typeof arg === "string" && arg.length > 100 ? arg.substring(0, 100) + "..." : arg)).join(" ")}`;
+        },
+      },
+      // MongoDB (via Mongoose) - enhanced tracing
+      "@opentelemetry/instrumentation-mongodb": {
+        enhancedDatabaseReporting: true, // include db.statement with query details
+      },
+    }),
+    // Runtime metrics (heap, event loop, active handles)
+    new RuntimeNodeInstrumentation({
+      monitoringPrecision: 5_000, // collect every 5s (matches metric export interval)
     }),
   ],
 });

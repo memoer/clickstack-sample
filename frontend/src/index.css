@@ -238,3 +238,45 @@ button.danger:hover {
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Database Selector Tabs */
+.database-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.db-tab {
+  padding: 0.5rem 1.25rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.db-tab:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.db-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.db-badge {
+  background: var(--primary);
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}

@@ -9,47 +9,67 @@ interface Task {
   createdAt: string
 }
 
+type DatabaseType = 'memory' | 'mongodb' | 'redis' | 'postgres'
+
 const API_BASE = 'http://localhost:3000'
 
+const DB_ROUTES: Record<DatabaseType, string> = {
+  memory: '/tasks',
+  mongodb: '/mongo/tasks',
+  redis: '/redis/tasks',
+  postgres: '/postgres/tasks',
+}
+
+const DB_LABELS: Record<DatabaseType, string> = {
+  memory: 'In-Memory',
+  mongodb: 'MongoDB',
+  redis: 'Redis',
+  postgres: 'PostgreSQL',
+}
+
 function App() {
+  const [database, setDatabase] = useState<DatabaseType>('memory')
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newTask, setNewTask] = useState({ title: '', description: '' })
   const [logs, setLogs] = useState<string[]>([])
 
+  const apiPath = `${API_BASE}${DB_ROUTES[database]}`
+
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString()
     setLogs(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 19)])
-    
+
     // Also send to HyperDX as a custom action
-    HyperDX.addAction(message, { timestamp })
+    HyperDX.addAction(message, { timestamp, database })
   }
 
   const fetchTasks = useCallback(async () => {
     setLoading(true)
     setError(null)
-    addLog('📡 Fetching tasks...')
-    
+    addLog(`📡 Fetching tasks from ${DB_LABELS[database]}...`)
+
     try {
-      const res = await fetch(`${API_BASE}/tasks`)
+      const res = await fetch(apiPath)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       const data = await res.json()
       setTasks(data)
-      addLog(`✅ Fetched ${data.length} tasks`)
+      addLog(`✅ Fetched ${data.length} tasks from ${DB_LABELS[database]}`)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error'
       setError(errorMsg)
       addLog(`❌ Error: ${err}`)
-      
+
       // Record error in HyperDX
       HyperDX.recordException(err instanceof Error ? err : new Error(errorMsg), {
         operation: 'fetchTasks',
+        database,
       })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [apiPath, database])
 
   useEffect(() => {
     fetchTasks()
@@ -59,17 +79,17 @@ function App() {
     e.preventDefault()
     if (!newTask.title.trim()) return
 
-    addLog(`📝 Creating task: ${newTask.title}`)
-    
+    addLog(`📝 Creating task in ${DB_LABELS[database]}: ${newTask.title}`)
+
     try {
-      const res = await fetch(`${API_BASE}/tasks`, {
+      const res = await fetch(apiPath, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTask),
       })
-      
+
       if (!res.ok) throw new Error('Failed to create task')
-      
+
       const task = await res.json()
       setTasks(prev => [...prev, task])
       setNewTask({ title: '', description: '' })
@@ -81,17 +101,17 @@ function App() {
   }
 
   const toggleTask = async (task: Task) => {
-    addLog(`🔄 Toggling task: ${task.id}`)
-    
+    addLog(`🔄 Toggling task in ${DB_LABELS[database]}: ${task.id}`)
+
     try {
-      const res = await fetch(`${API_BASE}/tasks/${task.id}`, {
+      const res = await fetch(`${apiPath}/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: !task.completed }),
       })
-      
+
       if (!res.ok) throw new Error('Failed to update task')
-      
+
       const updated = await res.json()
       setTasks(prev => prev.map(t => t.id === task.id ? updated : t))
       addLog(`✅ Task ${task.completed ? 'uncompleted' : 'completed'}`)
@@ -102,12 +122,12 @@ function App() {
   }
 
   const deleteTask = async (id: string) => {
-    addLog(`🗑️ Deleting task: ${id}`)
-    
+    addLog(`🗑️ Deleting task from ${DB_LABELS[database]}: ${id}`)
+
     try {
-      const res = await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' })
+      const res = await fetch(`${apiPath}/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete task')
-      
+
       setTasks(prev => prev.filter(t => t.id !== id))
       addLog(`✅ Deleted task: ${id}`)
     } catch (err) {
@@ -118,7 +138,7 @@ function App() {
 
   const testSlowOperation = async () => {
     addLog('🐢 Starting slow operation...')
-    
+
     try {
       const res = await fetch(`${API_BASE}/tasks/slow`)
       const data = await res.json()
@@ -130,7 +150,7 @@ function App() {
 
   const testError = async () => {
     addLog('💥 Triggering error...')
-    
+
     try {
       const res = await fetch(`${API_BASE}/tasks/error`)
       if (!res.ok) {
@@ -149,7 +169,7 @@ function App() {
 
   const checkHealth = async () => {
     addLog('🏥 Checking health...')
-    
+
     try {
       const res = await fetch(`${API_BASE}/health`)
       const data = await res.json()
@@ -174,6 +194,12 @@ function App() {
     }
   }
 
+  const handleDatabaseChange = (db: DatabaseType) => {
+    setDatabase(db)
+    setTasks([]) // Clear tasks when switching database
+    addLog(`🔀 Switched to ${DB_LABELS[db]}`)
+  }
+
   return (
     <div className="container">
       <header>
@@ -181,10 +207,23 @@ function App() {
         <p>NestJS + React + OpenTelemetry → ClickStack</p>
       </header>
 
+      {/* Database Selector Tabs */}
+      <div className="database-tabs">
+        {(Object.keys(DB_ROUTES) as DatabaseType[]).map((db) => (
+          <button
+            key={db}
+            className={`db-tab ${database === db ? 'active' : ''}`}
+            onClick={() => handleDatabaseChange(db)}
+          >
+            {DB_LABELS[db]}
+          </button>
+        ))}
+      </div>
+
       <div className="grid">
         <section className="card">
-          <h2>📋 Task Manager</h2>
-          
+          <h2>📋 Task Manager <span className="db-badge">{DB_LABELS[database]}</span></h2>
+
           <form onSubmit={createTask} className="form">
             <input
               type="text"
@@ -225,7 +264,7 @@ function App() {
         <section className="card">
           <h2>🧪 Test Observability</h2>
           <p>Generate traces and logs for ClickStack</p>
-          
+
           <div className="button-group">
             <button onClick={fetchTasks}>🔄 Refresh Tasks</button>
             <button onClick={checkHealth}>🏥 Health Check</button>

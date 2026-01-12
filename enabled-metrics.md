@@ -23,7 +23,59 @@ Defined in `backend/src/tasks/tasks.metric.ts`
 
 ---
 
-## 2. Node.js Runtime Metrics
+## 2. Database Task Metrics
+
+Defined in `backend/src/shared/metrics/database-tasks.metric.ts`
+
+| Metric Name | Type | Unit | Description |
+|-------------|------|------|-------------|
+| `db_tasks.operations.total` | Counter | 1 | Total number of database task operations |
+| `db_tasks.operation.duration` | Histogram | ms | Duration of database task operations |
+| `db_tasks.active.count` | UpDownCounter | 1 | Current number of active tasks per database |
+
+### Attributes
+
+| Metric | Attributes |
+|--------|------------|
+| `db_tasks.operations.total` | `database`, `operation`, `status` |
+| `db_tasks.operation.duration` | `database`, `operation` |
+| `db_tasks.active.count` | `database` |
+
+### Attribute Values
+
+| Attribute | Values |
+|-----------|--------|
+| `database` | `mongodb`, `redis`, `postgres` |
+| `operation` | `getAll`, `getById`, `create`, `update`, `delete` |
+| `status` | `success`, `error`, `not_found` |
+
+### Useful Queries
+
+**Operations by Database:**
+```sql
+SELECT
+  Attributes['database'] as database,
+  Attributes['operation'] as operation,
+  sum(Value) as count
+FROM otel_metrics_sum
+WHERE MetricName = 'db_tasks.operations.total'
+GROUP BY database, operation
+ORDER BY count DESC
+```
+
+**Average Duration per Database:**
+```sql
+SELECT
+  Attributes['database'] as database,
+  avg(Sum / Count) as avg_duration_ms
+FROM otel_metrics_histogram
+WHERE MetricName = 'db_tasks.operation.duration'
+GROUP BY database
+```
+
+---
+
+## 3. Node.js Runtime Metrics
 
 From `@opentelemetry/instrumentation-runtime-node`
 
@@ -49,7 +101,7 @@ From `@opentelemetry/instrumentation-runtime-node`
 
 ---
 
-## 3. Custom HTTP Metrics
+## 4. Custom HTTP Metrics
 
 Defined in `backend/src/metrics/http.metric.ts`
 
@@ -76,7 +128,7 @@ Defined in `backend/src/metrics/http.metric.ts`
 
 ---
 
-## 4. HTTP Metrics (Auto-Instrumentation)
+## 5. HTTP Metrics (Auto-Instrumentation)
 
 From `@opentelemetry/instrumentation-http` (included in auto-instrumentations-node)
 

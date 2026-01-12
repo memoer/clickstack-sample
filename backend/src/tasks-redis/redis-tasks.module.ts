@@ -3,8 +3,7 @@ import Redis from "ioredis";
 import { RedisTasksController } from "./redis-tasks.controller";
 import { RedisTasksService } from "./redis-tasks.service";
 import { Logger } from "../logger";
-
-export const REDIS_CLIENT = "REDIS_CLIENT";
+import { REDIS_CLIENT } from "./redis-tasks.constants";
 
 @Module({
   controllers: [RedisTasksController],

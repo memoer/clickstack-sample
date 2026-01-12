@@ -1,6 +1,4 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { Logger } from "../logger";
 import {
   Task,
   CreateTaskDto,
@@ -8,31 +6,27 @@ import {
 } from "../shared/interfaces/task.interface";
 import {
   recordDbMetrics,
-  dbActiveTasksGauge,
   dbTaskOperationsCounter,
 } from "../shared/metrics/database-tasks.metric";
+import { prismaMain } from "src/prisma-client";
 
 @Injectable()
 export class PostgresTasksService {
-  private readonly logger = new Logger(PostgresTasksService.name);
   private readonly DB = "postgres" as const;
-
-  constructor(private readonly prisma: PrismaService) {}
 
   async getAllTasks(): Promise<Task[]> {
     const startTime = Date.now();
-    const tasks = await this.prisma.task.findMany({
+    const tasks = await prismaMain.task.findMany({
       orderBy: { createdAt: "desc" },
     });
 
     recordDbMetrics(this.DB, "getAll", startTime);
-    this.logger.info({ count: tasks.length, db: this.DB }, "Retrieved all tasks");
     return tasks;
   }
 
   async getTaskById(id: string): Promise<Task> {
     const startTime = Date.now();
-    const task = await this.prisma.task.findUnique({ where: { id } });
+    const task = await prismaMain.task.findUnique({ where: { id } });
 
     if (!task) {
       dbTaskOperationsCounter.add(1, {
@@ -40,7 +34,6 @@ export class PostgresTasksService {
         operation: "getById",
         status: "not_found",
       });
-      this.logger.warn({ taskId: id, db: this.DB }, "Task not found");
       throw new NotFoundException(`Task with ID ${id} not found`);
     }
 
@@ -50,16 +43,14 @@ export class PostgresTasksService {
 
   async createTask(data: CreateTaskDto): Promise<Task> {
     const startTime = Date.now();
-    const task = await this.prisma.task.create({
+    const task = await prismaMain.task.create({
       data: {
         title: data.title,
         description: data.description,
       },
     });
 
-    dbActiveTasksGauge.add(1, { database: this.DB });
     recordDbMetrics(this.DB, "create", startTime);
-    this.logger.info({ taskId: task.id, db: this.DB }, "Task created");
     return task;
   }
 
@@ -67,13 +58,12 @@ export class PostgresTasksService {
     const startTime = Date.now();
 
     try {
-      const task = await this.prisma.task.update({
+      const task = await prismaMain.task.update({
         where: { id },
         data,
       });
 
       recordDbMetrics(this.DB, "update", startTime);
-      this.logger.info({ taskId: id, db: this.DB }, "Task updated");
       return task;
     } catch (error) {
       // Prisma throws when record not found
@@ -93,11 +83,9 @@ export class PostgresTasksService {
     const startTime = Date.now();
 
     try {
-      await this.prisma.task.delete({ where: { id } });
+      await prismaMain.task.delete({ where: { id } });
 
-      dbActiveTasksGauge.add(-1, { database: this.DB });
       recordDbMetrics(this.DB, "delete", startTime);
-      this.logger.info({ taskId: id, db: this.DB }, "Task deleted");
     } catch (error) {
       // Prisma throws when record not found
       if ((error as { code?: string }).code === "P2025") {

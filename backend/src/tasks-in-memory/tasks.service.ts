@@ -26,7 +26,6 @@ export class TasksService {
     const tasks = Array.from(this.tasks.values());
 
     recordMetrics("getAll", startTime);
-    this.logger.info({ count: tasks.length }, "Retrieved all tasks");
 
     return tasks;
   }
@@ -62,7 +61,6 @@ export class TasksService {
     activeTasksGauge.add(1);
 
     recordMetrics("create", startTime);
-    this.logger.info({ taskId: task.id, title: data.title }, "Task created");
 
     return task;
   }
@@ -76,10 +74,6 @@ export class TasksService {
     this.tasks.set(id, updatedTask);
 
     recordMetrics("update", startTime);
-    this.logger.info(
-      { taskId: id, completed: updatedTask.completed },
-      "Task updated"
-    );
 
     return updatedTask;
   }
@@ -93,7 +87,6 @@ export class TasksService {
     activeTasksGauge.add(-1);
 
     recordMetrics("delete", startTime);
-    this.logger.info({ taskId: id }, "Task deleted");
   }
 
   async simulateSlowOperation(): Promise<{ message: string }> {

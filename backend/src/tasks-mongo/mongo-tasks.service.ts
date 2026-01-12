@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
-import { Logger } from "../logger";
 import { TaskDocument } from "./schemas/task.schema";
 import {
   Task,
@@ -10,13 +9,11 @@ import {
 } from "../shared/interfaces/task.interface";
 import {
   recordDbMetrics,
-  dbActiveTasksGauge,
   dbTaskOperationsCounter,
 } from "../shared/metrics/database-tasks.metric";
 
 @Injectable()
 export class MongoTasksService {
-  private readonly logger = new Logger(MongoTasksService.name);
   private readonly DB = "mongodb" as const;
 
   constructor(
@@ -26,10 +23,9 @@ export class MongoTasksService {
   async getAllTasks(): Promise<Task[]> {
     const startTime = Date.now();
     const docs = await this.taskModel.find().exec();
-    const tasks = docs.map((doc) => this.toTask(doc));
+    const tasks = docs.map(doc => this.toTask(doc));
 
     recordDbMetrics(this.DB, "getAll", startTime);
-    this.logger.info({ count: tasks.length, db: this.DB }, "Retrieved all tasks");
     return tasks;
   }
 
@@ -43,7 +39,6 @@ export class MongoTasksService {
         operation: "getById",
         status: "not_found",
       });
-      this.logger.warn({ taskId: id, db: this.DB }, "Task not found");
       throw new NotFoundException(`Task with ID ${id} not found`);
     }
 
@@ -59,12 +54,7 @@ export class MongoTasksService {
       completed: false,
     });
 
-    dbActiveTasksGauge.add(1, { database: this.DB });
     recordDbMetrics(this.DB, "create", startTime);
-    this.logger.info(
-      { taskId: doc._id.toString(), db: this.DB },
-      "Task created"
-    );
     return this.toTask(doc);
   }
 
@@ -84,7 +74,6 @@ export class MongoTasksService {
     }
 
     recordDbMetrics(this.DB, "update", startTime);
-    this.logger.info({ taskId: id, db: this.DB }, "Task updated");
     return this.toTask(doc);
   }
 
@@ -101,9 +90,7 @@ export class MongoTasksService {
       throw new NotFoundException(`Task with ID ${id} not found`);
     }
 
-    dbActiveTasksGauge.add(-1, { database: this.DB });
     recordDbMetrics(this.DB, "delete", startTime);
-    this.logger.info({ taskId: id, db: this.DB }, "Task deleted");
   }
 
   private toTask(doc: TaskDocument): Task {

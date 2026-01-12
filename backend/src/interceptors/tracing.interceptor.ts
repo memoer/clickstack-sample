@@ -64,7 +64,7 @@ export class TracingInterceptor implements NestInterceptor {
             userId,
             ...requestMeta,
           },
-          `→ ${method} ${url}`
+          `→REQUEST ${method} ${url}`
         );
 
         context.with(trace.setSpan(context.active(), span), () => {
@@ -217,7 +217,7 @@ export class TracingInterceptor implements NestInterceptor {
         userId,
         responseBody,
       },
-      `← ${method} ${url} response in ${duration}ms`
+      `←RESPONSE ${method} ${url} ${duration}ms`
     );
   }
 
@@ -256,7 +256,7 @@ export class TracingInterceptor implements NestInterceptor {
         userId,
         requestBody,
       },
-      `← ${method} ${url} error in ${duration}ms`
+      `← ERROR ${method} ${url} ${duration}ms`
     );
   }
 }

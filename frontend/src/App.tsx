@@ -11,7 +11,7 @@ interface Task {
 
 type DatabaseType = 'memory' | 'mongodb' | 'redis' | 'postgres'
 
-const API_BASE = 'http://localhost:3000'
+const API_BASE = import.meta.env.VITE_API_URL;
 
 const DB_ROUTES: Record<DatabaseType, string> = {
   memory: '/tasks',

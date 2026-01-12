@@ -3,7 +3,7 @@ import HyperDX from '@hyperdx/browser';
 // Initialize HyperDX for Session Replay, Browser Logs, and Frontend Tracing
 // This sends data to your local ClickStack instance
 
-const HYPERDX_API_KEY = import.meta.env.VITE_HYPERDX_API_KEY 
+const HYPERDX_API_KEY = import.meta.env.VITE_HYPERDX_API_KEY;
 const OTEL_ENDPOINT = import.meta.env.VITE_OTEL_ENDPOINT;
 
 // Only initialize if we have configuration

@@ -22,7 +22,8 @@ import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { RuntimeNodeInstrumentation } from "@opentelemetry/instrumentation-runtime-node";
-import { Resource } from "@opentelemetry/resources";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import { PrismaInstrumentation } from "@prisma/instrumentation";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -81,7 +82,7 @@ const logExporter = new OTLPLogExporter({
 
 const sdk = new NodeSDK({
   // 서비스 리소스 정보
-  resource: new Resource({
+  resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: SERVICE_VERSION,
     [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: DEPLOYMENT_ENV,
@@ -110,34 +111,58 @@ const sdk = new NodeSDK({
   instrumentations: [
     getNodeAutoInstrumentations({
       "@opentelemetry/instrumentation-fs": { enabled: false },
-      "@opentelemetry/instrumentation-pino": {
-        logHook: (span, record) => {
-          record["resource.service.name"] = SERVICE_NAME;
-          record["resource.service.version"] = SERVICE_VERSION;
-          record["resource.service.env"] = DEPLOYMENT_ENV;
+
+      "@opentelemetry/instrumentation-http": {
+        ignoreIncomingRequestHook: request => {
+          const url = request.url || "";
+          return url === "/health" || url === "/metrics";
+        },
+        // Skip tracing for OTLP exporter calls
+        ignoreOutgoingRequestHook: request => {
+          const host = request.hostname || request.host || "";
+          return host.includes("localhost:8080"); // OTLP collector
         },
       },
-      // PostgreSQL (pg) - enhanced tracing
-      "@opentelemetry/instrumentation-pg": {
-        enhancedDatabaseReporting: true, // include db.statement with sanitized params
-        addSqlCommenterCommentToQueries: true, // add trace context to SQL comments
+
+      "@opentelemetry/instrumentation-pino": {
+        logHook: (span, record) => {
+          record["service.name"] = SERVICE_NAME;
+          record["service.version"] = SERVICE_VERSION;
+          record["service.env"] = DEPLOYMENT_ENV;
+        },
       },
+
+      // PostgreSQL (pg) - disabled because Prisma uses its own query engine
+      // If you use raw `pg` queries elsewhere, re-enable this
+      "@opentelemetry/instrumentation-pg": { enabled: false },
+
       // Redis (ioredis) - capture commands
       "@opentelemetry/instrumentation-ioredis": {
         dbStatementSerializer: (cmdName, cmdArgs) => {
           // Serialize command for span attribute (redact sensitive values if needed)
-          return `${cmdName} ${cmdArgs.map(arg => (typeof arg === "string" && arg.length > 100 ? arg.substring(0, 100) + "..." : arg)).join(" ")}`;
+          return `${cmdName} ${cmdArgs
+            .map(arg =>
+              typeof arg === "string" && arg.length > 100
+                ? arg.substring(0, 100) + "..."
+                : arg
+            )
+            .join(" ")}`;
         },
       },
+
       // MongoDB (via Mongoose) - enhanced tracing
       "@opentelemetry/instrumentation-mongodb": {
         enhancedDatabaseReporting: true, // include db.statement with query details
       },
     }),
+
     // Runtime metrics (heap, event loop, active handles)
     new RuntimeNodeInstrumentation({
       monitoringPrecision: 5_000, // collect every 5s (matches metric export interval)
     }),
+
+    // Prisma ORM tracing
+    new PrismaInstrumentation(),
   ],
 });
 

@@ -1,0 +1,3 @@
+#!/bin/bash
+npm install @nestjs/common @nestjs/core @nestjs/mongoose @nestjs/platform-express @opentelemetry/api @opentelemetry/api-logs @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-logs-otlp-http @opentelemetry/exporter-metrics-otlp-http @opentelemetry/exporter-trace-otlp-http @opentelemetry/instrumentation-pino @opentelemetry/instrumentation-runtime-node @opentelemetry/resources @opentelemetry/sdk-logs @opentelemetry/sdk-metrics @opentelemetry/sdk-node @opentelemetry/sdk-trace-node @opentelemetry/semantic-conventions @prisma/instrumentation dotenv ioredis mongoose pg pino pino-pretty reflect-metadata rx
+npm install @nestjs/cli @types/express @types/node typescript --save-dev

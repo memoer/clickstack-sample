@@ -20,15 +20,6 @@ const dbTaskDurationHistogram = meter.createHistogram(
   }
 );
 
-// UpDownCounter: Current number of active tasks per database
-export const dbActiveTasksGauge = meter.createUpDownCounter(
-  "db_tasks.active.count",
-  {
-    description: "Current number of active tasks per database",
-    unit: "1",
-  }
-);
-
 /**
  * Record metrics for a database operation
  */

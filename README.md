@@ -75,13 +75,25 @@ clickstack-otel/
 ├── backend/                 # NestJS + Vanilla OpenTelemetry + Pino
 │   ├── src/
 │   │   ├── tracing.ts      # OpenTelemetry SDK 초기화 (벤더 중립)
-│   │   ├── logger.ts       # Pino 로거 (OTel 통합)
+│   │   ├── logger.ts       # Pino 로거 클래스 (OTel 통합)
 │   │   ├── main.ts
 │   │   ├── app.module.ts
-│   │   └── tasks/          # Tasks CRUD (메트릭 + 트레이스 + 로그)
+│   │   ├── interceptors/
+│   │   │   └── tracing.interceptor.ts  # 요청별 스팬 생성
+│   │   ├── filters/
+│   │   │   └── http-exception.filter.ts # 전역 에러 처리 + traceId 포함
+│   │   └── tasks/
+│   │       ├── tasks.module.ts
+│   │       ├── tasks.controller.ts
+│   │       ├── tasks.service.ts    # CRUD + 로깅
+│   │       └── tasks.metric.ts     # 커스텀 메트릭 정의
 │   └── package.json
-├── frontend/               # React + Vite
-│   └── ...
+├── frontend/               # React + Vite + HyperDX
+│   ├── src/
+│   │   ├── hyperdx.ts      # HyperDX SDK 초기화
+│   │   ├── main.tsx
+│   │   └── App.tsx
+│   └── package.json
 ├── docker-compose.yml
 └── README.md
 ```
@@ -130,7 +142,7 @@ npm run dev
 | GET | `/tasks` | 모든 태스크 조회 |
 | GET | `/tasks/:id` | 특정 태스크 조회 |
 | POST | `/tasks` | 태스크 생성 |
-| PUT | `/tasks/:id` | 태스크 수정 |
+| PATCH | `/tasks/:id` | 태스크 수정 |
 | DELETE | `/tasks/:id` | 태스크 삭제 |
 | GET | `/tasks/slow` | 느린 작업 시뮬레이션 |
 | GET | `/tasks/error` | 에러 시뮬레이션 |
@@ -145,31 +157,56 @@ import pino from 'pino';
 import { trace, context } from '@opentelemetry/api';
 
 // Trace context를 모든 로그에 자동 추가
-function traceContextMixin() {
+function traceContextMixin(): object {
   const activeSpan = trace.getSpan(context.active());
   if (!activeSpan) return {};
-  
+
   const spanContext = activeSpan.spanContext();
   return {
     traceId: spanContext.traceId,
     spanId: spanContext.spanId,
+    traceFlags: spanContext.traceFlags,  // 샘플링 플래그
   };
 }
 
-export const logger = pino({
-  mixin: traceContextMixin,  // 모든 로그에 traceId, spanId 포함!
+const rootLogger = pino({
+  mixin: traceContextMixin,
+  // ... 기타 설정
 });
+
+// 클래스 기반 래퍼로 context 필드 자동 추가
+export class Logger {
+  private logger: pino.Logger;
+
+  constructor(context?: string) {
+    this.logger = context ? rootLogger.child({ context }) : rootLogger;
+  }
+
+  info(msg: string): void;
+  info(ctx: object, msg: string): void;
+  info(ctxOrMsg: string | object, msg?: string): void {
+    if (typeof ctxOrMsg === 'string') {
+      this.logger.info(ctxOrMsg);
+    } else {
+      this.logger.info(ctxOrMsg, msg);
+    }
+  }
+  // warn, error, debug 메서드도 동일한 패턴...
+}
 ```
 
 ### 2. 로그 사용 예시
 
 ```typescript
-import { logger } from '../logger';
+import { Logger } from '../logger';
 
-// 로그에 자동으로 traceId, spanId가 포함됨!
-logger.info({ taskId: id, title }, 'Task created');
-logger.warn({ taskId: id }, 'Task not found');
-logger.error({ err: error }, 'Operation failed');
+// 클래스명을 context로 사용 - 로그 검색 시 유용!
+private readonly logger = new Logger(TasksService.name);
+
+// 로그에 자동으로 traceId, spanId, context가 포함됨!
+this.logger.info({ taskId: id, title }, 'Task created');
+this.logger.warn({ taskId: id }, 'Task not found');
+this.logger.error(error, 'Operation failed');  // Error 객체 직접 전달 가능
 ```
 
 ### 3. 로그 출력 예시
@@ -181,9 +218,13 @@ logger.error({ err: error }, 'Operation failed');
   "msg": "Task created",
   "taskId": "task-123",
   "title": "Learn ClickStack",
+  "context": "TasksService",
   "traceId": "abc123def456...",
   "spanId": "789xyz...",
-  "service": "clickstack-demo-backend"
+  "traceFlags": 1,
+  "service": "clickstack-demo-backend",
+  "version": "1.0.0",
+  "env": "development"
 }
 ```
 
@@ -235,6 +276,24 @@ async function createTask(data) {
 }
 ```
 
+### 6. 에러 응답 형식 (TraceId 포함)
+
+모든 API 에러 응답에는 디버깅을 위한 `traceId`가 포함됩니다:
+
+```json
+{
+  "statusCode": 500,
+  "message": "Database connection failed",
+  "error": "Internal Server Error",
+  "timestamp": "2024-01-15T10:30:00.000Z",
+  "path": "/tasks/123",
+  "traceId": "abc123def456789..."
+}
+```
+
+> 💡 **Tip**: 사용자가 에러를 보고하면 `traceId`로 ClickStack에서 해당 요청의 전체 트레이스와 로그를 검색할 수 있습니다.
+> Search → Traces → `traceId:abc123def456789...`
+
 ## 환경 변수
 
 ### Backend
@@ -246,18 +305,18 @@ async function createTask(data) {
 | `OTEL_SERVICE_NAME` | `clickstack-demo-backend` | 서비스 이름 |
 | `SERVICE_VERSION` | `1.0.0` | 서비스 버전 |
 | `NODE_ENV` | `development` | 환경 |
-| `LOG_LEVEL` | `info` (prod) / `debug` (dev) | Pino 로그 레벨 |
+| `LOG_LEVEL` | `info` | Pino 로그 레벨 (trace, debug, info, warn, error, fatal) |
 | `PORT` | `3000` | 서버 포트 |
 
 ### Frontend
 
 | 변수 | 기본값 | 설명 |
 |-----|-------|------|
-| `VITE_OTEL_ENDPOINT` | `http://localhost:4318` | OTLP 엔드포인트 |
+| `VITE_OTEL_ENDPOINT` | `http://localhost:4318` | OTLP 엔드포인트 (HyperDX SDK도 이 엔드포인트 사용) |
 | `VITE_SERVICE_NAME` | `clickstack-demo-frontend` | 서비스 이름 |
 | `VITE_SERVICE_VERSION` | `1.0.0` | 서비스 버전 |
 | `VITE_OTEL_API_KEY` | - | OTLP 인증 API 키 |
-| `VITE_HYPERDX_API_KEY` | (VITE_OTEL_API_KEY) | Session Replay API 키 |
+| `VITE_HYPERDX_API_KEY` | - | Session Replay API 키 (HyperDX 인증용) |
 
 ## Docker Compose로 전체 실행
 

@@ -89,10 +89,10 @@ const sdk = new NodeSDK({
   // Trace Exporter
   traceExporter,
 
-  // Metric Reader (10초마다 내보냄)
+  // Metric Reader
   metricReader: new PeriodicExportingMetricReader({
     exporter: metricExporter,
-    exportIntervalMillis: 10000,
+    exportIntervalMillis: 5_000,
   }),
 
   // Log Processor
@@ -115,8 +115,7 @@ const sdk = new NodeSDK({
 sdk.start();
 
 console.log("════════════════════════════════════════════════════════════");
-console.log("🔭 OpenTelemetry SDK Initialized (Vendor-neutral)");
-console.log("════════════════════════════════════════════════════════════");
+console.log("🔭 OpenTelemetry SDK Initialized");
 console.log(`   Service:     ${SERVICE_NAME}`);
 console.log(`   Version:     ${SERVICE_VERSION}`);
 console.log(`   Environment: ${DEPLOYMENT_ENV}`);

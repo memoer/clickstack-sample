@@ -12,7 +12,7 @@ export const taskOperationsCounter = meter.createCounter(
 );
 
 // Histogram: 작업 처리 시간
-export const taskDurationHistogram = meter.createHistogram(
+const taskDurationHistogram = meter.createHistogram(
   "tasks.operation.duration",
   {
     description: "Duration of task operations in milliseconds",
@@ -34,3 +34,11 @@ export const taskErrorsCounter = meter.createCounter("tasks.errors.total", {
   description: "Total number of task operation errors",
   unit: "1",
 });
+
+// ==========================================================================
+// Hepler Functions
+// ==========================================================================
+export function recordMetrics(operation: string, startTime: number): void {
+  taskOperationsCounter.add(1, { operation, status: "success" });
+  taskDurationHistogram.record(Date.now() - startTime, { operation });
+}

@@ -24,8 +24,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<Response>();
 
     const { status, message, error } = this.extractErrorInfo(exception);
     const traceId = this.getTraceId();
@@ -72,7 +72,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return {
       status: HttpStatus.INTERNAL_SERVER_ERROR,
       message:
-        exception instanceof Error ? exception.message : "Internal server error",
+        exception instanceof Error
+          ? exception.message
+          : "Internal server error",
       error: "Internal Server Error",
     };
   }
@@ -97,7 +99,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     if (status >= 500) {
       this.logger.error(
-        { ...logContext, err: exception instanceof Error ? exception : undefined },
+        {
+          ...logContext,
+          err: exception instanceof Error ? exception : undefined,
+        },
         `[${status}] ${request.method} ${request.url}`
       );
     } else if (status >= 400) {

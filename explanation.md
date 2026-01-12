@@ -383,6 +383,125 @@ async function getAllTasks() {
 }
 ```
 
+#### TracingInterceptor (NestJS 전역 인터셉터)
+
+모든 HTTP 요청에 자동으로 스팬을 생성하는 인터셉터입니다:
+
+```
+HTTP Request: GET /tasks
+              │
+              ▼
+┌──────────────────────────┐
+│ TracingInterceptor       │
+│                          │
+│ span name:               │
+│   TasksController.getAll │
+│                          │
+│ attributes:              │
+│   - http.method: GET     │
+│   - http.url: /tasks     │
+│   - code.class           │
+│   - code.function        │
+│   - http.duration_ms     │
+└──────────────────────────┘
+```
+
+```typescript
+// interceptors/tracing.interceptor.ts
+@Injectable()
+export class TracingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const request = context.switchToHttp().getRequest();
+    const className = context.getClass().name;
+    const handlerName = context.getHandler().name;
+    const spanName = `${className}.${handlerName}`;
+
+    return tracer.startActiveSpan(spanName, { kind: SpanKind.SERVER }, (span) => {
+      span.setAttributes({
+        'http.method': request.method,
+        'http.url': request.url,
+        'code.class': className,
+        'code.function': handlerName,
+      });
+
+      return next.handle().pipe(
+        tap(() => {
+          span.setAttribute('http.duration_ms', Date.now() - startTime);
+          span.setStatus({ code: SpanStatusCode.OK });
+        }),
+        catchError((error) => {
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          span.recordException(error);
+          throw error;
+        }),
+        finalize(() => span.end()),
+      );
+    });
+  }
+}
+```
+
+#### GlobalExceptionFilter (전역 에러 필터)
+
+모든 에러 응답에 `traceId`를 포함시켜 디버깅을 용이하게 합니다:
+
+```
+Error 발생
+    │
+    ▼
+┌──────────────────────────┐
+│ GlobalExceptionFilter    │
+│                          │
+│ - 현재 스팬에서 traceId  │
+│   추출                   │
+│ - 에러 로깅 (warn/error) │
+│ - 응답에 traceId 포함    │
+└──────────────────────────┘
+    │
+    ▼
+{
+  "statusCode": 500,
+  "message": "Database error",
+  "traceId": "abc123..."  ← 디버깅용!
+}
+```
+
+```typescript
+// filters/http-exception.filter.ts
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    // 현재 활성 스팬에서 traceId 추출
+    const traceId = trace.getSpan(context.active())?.spanContext()?.traceId;
+
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // 5xx는 error, 4xx는 warn 레벨로 로깅
+    if (status >= 500) {
+      this.logger.error(exception, 'Internal server error');
+    } else {
+      this.logger.warn({ statusCode: status, path: request.url }, 'Client error');
+    }
+
+    response.status(status).json({
+      statusCode: status,
+      message: this.getErrorMessage(exception),
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      traceId,  // 디버깅을 위한 traceId 포함!
+    });
+  }
+}
+```
+
+> 💡 **Tip**: 사용자가 에러를 보고하면 `traceId`로 ClickStack에서 전체 요청 컨텍스트(로그, 트레이스, 관련 스팬)를 검색할 수 있습니다.
+
 ---
 
 ### 4. Session Replay (세션 리플레이)
@@ -470,16 +589,22 @@ async function getAllTasks() {
 // frontend/src/hyperdx.ts
 import HyperDX from '@hyperdx/browser';
 
+const HYPERDX_API_KEY = import.meta.env.VITE_HYPERDX_API_KEY;
+const OTEL_ENDPOINT = import.meta.env.VITE_OTEL_ENDPOINT;  // 커스텀 엔드포인트!
+
 HyperDX.init({
-  apiKey: 'YOUR_API_KEY',
-  service: 'my-frontend',
-  
-  // 세션 리플레이 활성화 (기본값: true)
-  // consoleCapture: true,      // console.log 캡처
-  // advancedNetworkCapture: true, // 네트워크 요청 상세 캡처
-  
+  apiKey: HYPERDX_API_KEY,
+  service: 'clickstack-demo-frontend',
+
+  // 세션 리플레이 옵션
+  consoleCapture: true,           // console.log 자동 캡처
+  advancedNetworkCapture: true,   // 네트워크 요청 상세 정보 캡처
+
   // Trace Propagation (Backend와 연결)
   tracePropagationTargets: [/localhost:3000/i, /api/i],
+
+  // 벤더 중립성: 커스텀 OTLP 엔드포인트 지정 가능!
+  url: OTEL_ENDPOINT,
 });
 
 // 커스텀 이벤트 추가
@@ -619,9 +744,12 @@ import './hyperdx';
 import HyperDX from '@hyperdx/browser';
 
 HyperDX.init({
-  apiKey: process.env.VITE_HYPERDX_API_KEY,
-  service: 'my-frontend',
-  tracePropagationTargets: [/localhost:3000/i],
+  apiKey: import.meta.env.VITE_HYPERDX_API_KEY,
+  service: 'clickstack-demo-frontend',
+  tracePropagationTargets: [/localhost:3000/i, /api/i],
+  consoleCapture: true,
+  advancedNetworkCapture: true,
+  url: import.meta.env.VITE_OTEL_ENDPOINT,  // 커스텀 엔드포인트!
 });
 
 // 3. 컴포넌트에서 사용

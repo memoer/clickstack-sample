@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { Logger } from "../logger";
 import {
   activeTasksGauge,
-  taskDurationHistogram,
   taskOperationsCounter,
+  recordMetrics,
 } from "./tasks.metric";
 
 export interface Task {
@@ -25,7 +25,7 @@ export class TasksService {
 
     const tasks = Array.from(this.tasks.values());
 
-    this.recordMetrics("getAll", startTime);
+    recordMetrics("getAll", startTime);
     this.logger.info({ count: tasks.length }, "Retrieved all tasks");
 
     return tasks;
@@ -61,7 +61,7 @@ export class TasksService {
     this.tasks.set(task.id, task);
     activeTasksGauge.add(1);
 
-    this.recordMetrics("create", startTime);
+    recordMetrics("create", startTime);
     this.logger.info({ taskId: task.id, title: data.title }, "Task created");
 
     return task;
@@ -75,7 +75,7 @@ export class TasksService {
     const updatedTask = { ...task, ...data };
     this.tasks.set(id, updatedTask);
 
-    this.recordMetrics("update", startTime);
+    recordMetrics("update", startTime);
     this.logger.info(
       { taskId: id, completed: updatedTask.completed },
       "Task updated"
@@ -92,21 +92,8 @@ export class TasksService {
     this.tasks.delete(id);
     activeTasksGauge.add(-1);
 
-    this.recordMetrics("delete", startTime);
+    recordMetrics("delete", startTime);
     this.logger.info({ taskId: id }, "Task deleted");
-  }
-
-  async simulateSlowOperation(): Promise<{
-    message: string;
-    duration: number;
-  }> {
-    const duration = Math.floor(Math.random() * 2000) + 1000;
-
-    this.logger.info({ duration }, "Starting slow operation");
-    await this.delay(duration);
-    this.logger.info({ duration }, "Slow operation completed");
-
-    return { message: "Slow operation completed", duration };
   }
 
   async simulateError(): Promise<never> {
@@ -130,20 +117,12 @@ export class TasksService {
     return task;
   }
 
-  private recordMetrics(operation: string, startTime: number): void {
-    taskOperationsCounter.add(1, { operation, status: "success" });
-    taskDurationHistogram.record(Date.now() - startTime, { operation });
-  }
-
   private generateId(): string {
     return `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private simulateLatency(min: number, max: number): Promise<void> {
-    return this.delay(Math.floor(Math.random() * (max - min + 1)) + min);
-  }
-
-  private delay(ms: number): Promise<void> {
+    const ms = Math.floor(Math.random() * (max - min + 1)) + min;
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

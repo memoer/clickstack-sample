@@ -78,15 +78,35 @@ clickstack-otel/
 │   │   ├── logger.ts       # Pino 로거 클래스 (OTel 통합)
 │   │   ├── main.ts
 │   │   ├── app.module.ts
+│   │   ├── prisma-client.ts        # Prisma 클라이언트 (PostgreSQL)
 │   │   ├── interceptors/
-│   │   │   └── tracing.interceptor.ts  # 요청별 스팬 생성
+│   │   │   ├── tracing.interceptor.ts        # 요청별 스팬 생성
+│   │   │   └── tracing.interceptor.metric.ts # HTTP 메트릭
 │   │   ├── filters/
 │   │   │   └── http-exception.filter.ts # 전역 에러 처리 + traceId 포함
-│   │   └── tasks/
-│   │       ├── tasks.module.ts
-│   │       ├── tasks.controller.ts
-│   │       ├── tasks.service.ts    # CRUD + 로깅
-│   │       └── tasks.metric.ts     # 커스텀 메트릭 정의
+│   │   ├── shared/
+│   │   │   ├── interfaces/task.interface.ts  # 공통 Task 인터페이스
+│   │   │   └── metrics/database-tasks.metric.ts # DB별 메트릭
+│   │   ├── tasks-in-memory/        # In-Memory 저장소
+│   │   │   ├── tasks.module.ts
+│   │   │   ├── tasks.controller.ts
+│   │   │   ├── tasks.service.ts
+│   │   │   └── tasks.metric.ts
+│   │   ├── tasks-mongo/            # MongoDB 저장소
+│   │   │   ├── mongo-tasks.module.ts
+│   │   │   ├── mongo-tasks.controller.ts
+│   │   │   ├── mongo-tasks.service.ts
+│   │   │   └── schemas/task.schema.ts
+│   │   ├── tasks-redis/            # Redis 저장소
+│   │   │   ├── redis-tasks.module.ts
+│   │   │   ├── redis-tasks.controller.ts
+│   │   │   └── redis-tasks.service.ts
+│   │   └── tasks-postgres/         # PostgreSQL 저장소 (Prisma)
+│   │       ├── postgres-tasks.module.ts
+│   │       ├── postgres-tasks.controller.ts
+│   │       └── postgres-tasks.service.ts
+│   ├── prisma/
+│   │   └── schema.prisma           # Prisma 스키마
 │   └── package.json
 ├── frontend/               # React + Vite + HyperDX
 │   ├── src/
@@ -137,6 +157,8 @@ npm run dev
 
 ## API 엔드포인트
 
+### In-Memory 저장소 (`/tasks/*`)
+
 | Method | Endpoint | 설명 |
 |--------|----------|------|
 | GET | `/tasks` | 모든 태스크 조회 |
@@ -146,6 +168,41 @@ npm run dev
 | DELETE | `/tasks/:id` | 태스크 삭제 |
 | GET | `/tasks/slow` | 느린 작업 시뮬레이션 |
 | GET | `/tasks/error` | 에러 시뮬레이션 |
+
+### MongoDB 저장소 (`/mongo/tasks/*`)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/mongo/tasks` | 모든 태스크 조회 |
+| GET | `/mongo/tasks/:id` | 특정 태스크 조회 |
+| POST | `/mongo/tasks` | 태스크 생성 |
+| PATCH | `/mongo/tasks/:id` | 태스크 수정 |
+| DELETE | `/mongo/tasks/:id` | 태스크 삭제 |
+
+### Redis 저장소 (`/redis/tasks/*`)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/redis/tasks` | 모든 태스크 조회 |
+| GET | `/redis/tasks/:id` | 특정 태스크 조회 |
+| POST | `/redis/tasks` | 태스크 생성 |
+| PATCH | `/redis/tasks/:id` | 태스크 수정 |
+| DELETE | `/redis/tasks/:id` | 태스크 삭제 |
+
+### PostgreSQL 저장소 (`/postgres/tasks/*`)
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/postgres/tasks` | 모든 태스크 조회 |
+| GET | `/postgres/tasks/:id` | 특정 태스크 조회 |
+| POST | `/postgres/tasks` | 태스크 생성 |
+| PATCH | `/postgres/tasks/:id` | 태스크 수정 |
+| DELETE | `/postgres/tasks/:id` | 태스크 삭제 |
+
+### 공통
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
 | GET | `/health` | 헬스 체크 |
 
 ## 주요 코드 설명
@@ -174,12 +231,12 @@ const rootLogger = pino({
   // ... 기타 설정
 });
 
-// 클래스 기반 래퍼로 context 필드 자동 추가
+// 클래스 기반 래퍼로 logger 필드 자동 추가
 export class Logger {
-  private logger: pino.Logger;
+  private readonly o: pino.Logger;
 
-  constructor(context?: string) {
-    this.logger = context ? rootLogger.child({ context }) : rootLogger;
+  constructor(name: string) {
+    this.o = rootLogger.child({ logger: name });
   }
 
   info(msg: string): void;
@@ -218,13 +275,13 @@ this.logger.error(error, 'Operation failed');  // Error 객체 직접 전달 가
   "msg": "Task created",
   "taskId": "task-123",
   "title": "Learn ClickStack",
-  "context": "TasksService",
+  "logger": "TasksService",
   "traceId": "abc123def456...",
   "spanId": "789xyz...",
   "traceFlags": 1,
   "service": "clickstack-demo-backend",
   "version": "1.0.0",
-  "env": "development"
+  "env": "dev"
 }
 ```
 
@@ -315,7 +372,6 @@ async function createTask(data) {
 | `VITE_OTEL_ENDPOINT` | `http://localhost:4318` | OTLP 엔드포인트 (HyperDX SDK도 이 엔드포인트 사용) |
 | `VITE_SERVICE_NAME` | `clickstack-demo-frontend` | 서비스 이름 |
 | `VITE_SERVICE_VERSION` | `1.0.0` | 서비스 버전 |
-| `VITE_OTEL_API_KEY` | - | OTLP 인증 API 키 |
 | `VITE_HYPERDX_API_KEY` | - | Session Replay API 키 (HyperDX 인증용) |
 
 ## Docker Compose로 전체 실행

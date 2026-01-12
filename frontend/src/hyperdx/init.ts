@@ -1,4 +1,4 @@
-import HyperDX from '@hyperdx/browser';
+import HyperDX from "@hyperdx/browser";
 
 // Initialize HyperDX for Session Replay, Browser Logs, and Frontend Tracing
 // This sends data to your local ClickStack instance
@@ -11,19 +11,19 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
   HyperDX.init({
     // API Key from HyperDX UI -> Team Settings (optional for local dev)
     apiKey: HYPERDX_API_KEY,
-    
+
     // Service name for this frontend app
-    service: 'clickstack-demo-frontend',
-    
+    service: import.meta.env.VITE_SERVICE_NAME,
+
     // Enable session recording (captures user interactions)
     tracePropagationTargets: [/localhost:3000/i, /api/i],
-    
+
     // Console capture settings
     consoleCapture: true,
-    
+
     // Advanced session replay settings
     advancedNetworkCapture: true,
-    
+
     // Custom OTLP endpoint (for local ClickStack)
     url: OTEL_ENDPOINT,
   });
@@ -34,7 +34,7 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
   //   userEmail: 'demo@example.com',
   // });
 
-  console.log('🔭 HyperDX initialized - Session Replay enabled');
+  console.log("🔭 HyperDX initialized - Session Replay enabled");
   console.log(`   Sending telemetry to: ${OTEL_ENDPOINT}`);
 }
 

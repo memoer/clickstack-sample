@@ -1,5 +1,5 @@
 // Initialize OpenTelemetry BEFORE anything else
-import "./hyperdx";
+import "./hyperdx/init";
 
 import React from "react";
 import ReactDOM from "react-dom/client";

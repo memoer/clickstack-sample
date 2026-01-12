@@ -4,9 +4,9 @@ A list of all metrics currently available in the ClickStack OTEL backend.
 
 ---
 
-## 1. Custom Business Metrics
+## 1. Custom Business Metrics (In-Memory)
 
-Defined in `backend/src/tasks/tasks.metric.ts`
+Defined in `backend/src/tasks-in-memory/tasks.metric.ts`
 
 | Metric Name | Type | Unit | Description |
 |-------------|------|------|-------------|
@@ -31,7 +31,6 @@ Defined in `backend/src/shared/metrics/database-tasks.metric.ts`
 |-------------|------|------|-------------|
 | `db_tasks.operations.total` | Counter | 1 | Total number of database task operations |
 | `db_tasks.operation.duration` | Histogram | ms | Duration of database task operations |
-| `db_tasks.active.count` | UpDownCounter | 1 | Current number of active tasks per database |
 
 ### Attributes
 
@@ -39,7 +38,6 @@ Defined in `backend/src/shared/metrics/database-tasks.metric.ts`
 |--------|------------|
 | `db_tasks.operations.total` | `database`, `operation`, `status` |
 | `db_tasks.operation.duration` | `database`, `operation` |
-| `db_tasks.active.count` | `database` |
 
 ### Attribute Values
 
@@ -103,19 +101,17 @@ From `@opentelemetry/instrumentation-runtime-node`
 
 ## 4. Custom HTTP Metrics
 
-Defined in `backend/src/metrics/http.metric.ts`
+Defined in `backend/src/interceptors/tracing.interceptor.metric.ts`
 
 | Metric Name | Type | Unit | Description |
 |-------------|------|------|-------------|
 | `http.requests.total` | Counter | 1 | Total number of HTTP requests |
-| `http.active_users` | Observable Gauge | 1 | Unique active users in the last 5 minutes |
 
 ### Attributes
 
 | Metric | Attributes |
 |--------|------------|
 | `http.requests.total` | `method`, `route`, `status`, `status_code` |
-| `http.active_users` | (none) |
 
 ### Attribute Values
 
@@ -244,18 +240,6 @@ SELECT
   100.0 * sumIf(Value, Attributes['status'] = 'error') / sum(Value) as error_rate
 FROM otel_metrics_sum
 WHERE MetricName = 'http.requests.total'
-GROUP BY time
-ORDER BY time
-```
-
-### Active Users Over Time
-
-```sql
-SELECT
-  toStartOfMinute(TimeUnix) as time,
-  avg(Value) as active_users
-FROM otel_metrics_gauge
-WHERE MetricName = 'http.active_users'
 GROUP BY time
 ORDER BY time
 ```

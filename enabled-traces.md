@@ -6,38 +6,40 @@ A list of all trace instrumentations currently configured in the ClickStack OTEL
 
 ## Database Instrumentations
 
-### PostgreSQL (pg)
+### PostgreSQL (Prisma ORM)
 
-**Package**: `@opentelemetry/instrumentation-pg`
+**Package**: `@prisma/instrumentation`
+
+> **Note**: Native `@opentelemetry/instrumentation-pg` is **disabled** because Prisma uses its own query engine. Prisma instrumentation provides better visibility into ORM operations.
 
 | Configuration | Value | Purpose |
 |---------------|-------|---------|
-| `enhancedDatabaseReporting` | `true` | Include sanitized SQL in `db.statement` |
-| `addSqlCommenterCommentToQueries` | `true` | Add trace context as SQL comment |
+| Default | `new PrismaInstrumentation()` | Traces all Prisma client operations |
+
+#### Span Hierarchy
+
+```
+prisma:client:operation (findMany, create, update, delete, etc.)
+└── prisma:engine:query (actual SQL execution)
+```
 
 #### Span Attributes
 
 | Attribute | Example | Description |
 |-----------|---------|-------------|
 | `db.system` | `postgresql` | Database type |
-| `db.name` | `mydb` | Database name |
-| `db.user` | `postgres` | Database user |
-| `db.statement` | `SELECT * FROM users WHERE id = $1` | SQL query (sanitized) |
-| `db.operation` | `SELECT` | SQL operation |
-| `net.peer.name` | `localhost` | PostgreSQL host |
-| `net.peer.port` | `5432` | PostgreSQL port |
-| `db.sql.table` | `users` | Target table (when detectable) |
+| `db.type` | `sql` | Database category |
+| `db.statement` | `SELECT "Task"."id"... FROM "Task"` | Generated SQL query |
+| `prisma.model` | `Task` | Prisma model name |
+| `prisma.operation` | `findMany` | Prisma operation type |
 
-#### SQL Commenter Example
+#### Traced Operations
 
-When `addSqlCommenterCommentToQueries: true`, your queries include trace context:
-
-```sql
-SELECT * FROM users WHERE id = $1
-/*traceparent='00-abc123-def456-01'*/
-```
-
-This allows correlating database slow query logs with distributed traces.
+| Span Name | Description |
+|-----------|-------------|
+| `prisma:client:operation` | High-level Prisma method (findMany, create, etc.) |
+| `prisma:engine:query` | Low-level database query execution |
+| `prisma:engine:serialize` | Result serialization |
 
 ---
 
@@ -175,11 +177,33 @@ Each operation creates a child span with timing and attributes.
 ```typescript
 // backend/src/tracing.ts
 getNodeAutoInstrumentations({
-  // PostgreSQL
-  "@opentelemetry/instrumentation-pg": {
-    enhancedDatabaseReporting: true,
-    addSqlCommenterCommentToQueries: true,
+  // File system (disabled - too noisy)
+  "@opentelemetry/instrumentation-fs": { enabled: false },
+
+  // HTTP - with filtering for health checks and OTLP calls
+  "@opentelemetry/instrumentation-http": {
+    ignoreIncomingRequestHook: request => {
+      const url = request.url || "";
+      return url === "/health" || url === "/metrics";
+    },
+    ignoreOutgoingRequestHook: request => {
+      const host = request.hostname || request.host || "";
+      return host.includes("localhost:8080"); // OTLP collector
+    },
   },
+
+  // Pino - adds service metadata to logs
+  "@opentelemetry/instrumentation-pino": {
+    logHook: (span, record) => {
+      record["service.name"] = SERVICE_NAME;
+      record["service.version"] = SERVICE_VERSION;
+      record["service.env"] = DEPLOYMENT_ENV;
+    },
+  },
+
+  // PostgreSQL (pg) - disabled, using Prisma instead
+  "@opentelemetry/instrumentation-pg": { enabled: false },
+
   // Redis
   "@opentelemetry/instrumentation-ioredis": {
     dbStatementSerializer: (cmdName, cmdArgs) => {
@@ -190,11 +214,15 @@ getNodeAutoInstrumentations({
       ).join(" ")}`;
     },
   },
+
   // MongoDB
   "@opentelemetry/instrumentation-mongodb": {
     enhancedDatabaseReporting: true,
   },
 }),
+
+// Prisma ORM tracing (separate from auto-instrumentations)
+new PrismaInstrumentation(),
 ```
 
 ---

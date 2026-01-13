@@ -188,7 +188,7 @@ getNodeAutoInstrumentations({
     },
     ignoreOutgoingRequestHook: request => {
       const host = request.hostname || request.host || "";
-      return host.includes("localhost:8080"); // OTLP collector
+      return host.includes("localhost:8080"); // ClickStack UI
     },
   },
 

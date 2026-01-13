@@ -380,9 +380,7 @@ Utilization = Active Time / Total Time
 T+0에서 조치하면 연쇄 반응을 방지할 수 있습니다.
 ```
 
----
-
-### Summary Cheat Sheet
+#### Summary Cheat Sheet
 
 | Metric | 주시할 점 | Red Flag |
 |--------|----------|----------|
@@ -391,3 +389,61 @@ T+0에서 조치하면 연쇄 반응을 방지할 수 있습니다.
 | `eventloop.delay.p99` | 테일 레이턴시 | > 100ms 지속 |
 | `eventloop.utilization` | CPU 포화 | > 0.8 지속 |
 | `eventloop.delay.stddev` | 일관성 | 높은 분산 |
+
+## HTTP Semantic Convention Deep Dive
+
+**생성 소스**: `@opentelemetry/instrumentation-http`
+
+### `http.server.request.duration` (Histogram)
+
+서버로서 받은 요청의 처리 시간을 측정합니다.
+
+```
+[External Client] ──request──> [Your Server]
+                                    │
+                         ┌──────────┴──────────┐
+                         │ http.server.request │
+                         │    .duration        │
+                         │  (처리 시간)         │
+                         └──────────┬──────────┘
+                                    │
+[External Client] <──response── [Your Server]
+```
+
+**Attributes**:
+- `http.request.method` - HTTP 메서드
+- `http.route` - 라우트 패턴 (예: `/users/{id}`)
+- `http.response.status_code` - 응답 상태 코드
+- `url.scheme` - http 또는 https
+
+### `http.client.request.duration` (Histogram)
+
+클라이언트로서 보낸 요청의 왕복 시간을 측정합니다.
+
+```
+[Your App] ──request──> [External Service/API]
+    │
+    │  ┌────────────────────────┐
+    │  │ http.client.request    │
+    │  │    .duration           │
+    │  │  (왕복 시간)            │
+    │  └────────────────────────┘
+    │
+[Your App] <──response── [External Service/API]
+```
+
+**Attributes**:
+
+- `http.request.method` - HTTP 메서드
+- `http.response.status_code` - 응답 상태 코드
+- `server.address` - 대상 호스트
+- `server.port` - 대상 포트
+
+### Server vs Client Duration 비교
+
+| 측면 | `http.server.request.duration` | `http.client.request.duration` |
+|------|--------------------------------|--------------------------------|
+| **역할** | 서버로서 | 클라이언트로서 |
+| **측정** | 들어오는 요청 처리 시간 | 나가는 요청 왕복 시간 |
+| **포함** | 앱 처리 시간 | 네트워크 지연 + 원격 처리 시간 |
+| **용도** | API 성능 모니터링 | 의존성 지연 모니터링 |

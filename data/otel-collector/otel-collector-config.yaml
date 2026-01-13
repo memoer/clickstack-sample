@@ -1,0 +1,184 @@
+# ==============================================================================
+# OpenTelemetry Collector Configuration
+# ==============================================================================
+# 이 설정은 tail-based sampling을 구현합니다:
+#
+# [Traces]
+# - 에러가 있는 트레이스: 100% 보존
+# - 정상 트레이스: 10% 샘플링
+# - 이 방식은 완전한 트레이스를 본 후 결정하므로 에러 트레이스를 절대 놓치지 않습니다.
+#
+# [Logs]
+# - ERROR 이상 로그: 100% 보존 (routing connector로 분기)
+# - 정상 로그: 10% 샘플링 (probabilistic_sampler)
+# ==============================================================================
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 메모리 제한 (OOM 방지)
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # 배치 처리 (성능 최적화)
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+  # ===========================================================================
+  # Tail-Based Sampling
+  # https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/tailsamplingprocessor/README.md
+  # ===========================================================================
+  # decision_wait: 트레이스가 완료될 때까지 기다리는 시간
+  # num_traces: 메모리에 보관할 최대 트레이스 수
+  # policies: 샘플링 결정 정책 (순서대로 평가, 첫 매치에서 결정)
+  # ===========================================================================
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 100
+    policies:
+      # Policy 1: 에러가 있는 트레이스는 항상 보존 (100%)
+      - name: errors-policy
+        type: status_code
+        status_code:
+          status_codes:
+            - ERROR
+
+      # Policy 2: 지연 시간이 긴 트레이스 보존 (latency > 2s)
+      - name: latency-policy
+        type: latency
+        latency:
+          threshold_ms: 2000
+
+      # Policy 3: 특정 HTTP 상태 코드 보존 (4xx, 5xx)
+      - name: http-error-policy
+        type: string_attribute
+        string_attribute:
+          key: http.response.status_code
+          values:
+            - "400"
+            - "500"
+            - "502"
+            - "503"
+            - "504"
+
+      # Policy 4: 정상 트레이스는 10% 샘플링
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+  # ===========================================================================
+  # Probabilistic Sampling for Logs (정상 로그용)
+  # https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/probabilisticsamplerprocessor/README.md
+  # ===========================================================================
+  # 정상 로그의 10%만 샘플링합니다.
+  # hash_seed를 사용하여 동일 로그가 항상 같은 결과를 얻도록 합니다.
+  # ===========================================================================
+  probabilistic_sampler/logs:
+    sampling_percentage: 10
+    hash_seed: 42
+
+# ==============================================================================
+# Connectors (파이프라인 연결)
+# https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/connector/routingconnector/README.md
+# ==============================================================================
+# routing connector는 조건에 따라 데이터를 다른 파이프라인으로 분기합니다.
+# ==============================================================================
+connectors:
+  # 로그를 severity에 따라 분기
+  routing/logs:
+    default_pipelines: [logs/normal]
+    error_mode: ignore
+    table:
+      # ERROR 이상 (ERROR=17, FATAL=21) → 에러 파이프라인 (100% 보존)
+      # context: log를 지정해야 severity_number에 접근 가능
+      - context: log
+        condition: severity_number >= SEVERITY_NUMBER_ERROR
+        pipelines: [logs/errors]
+
+exporters:
+  # ClickStack (HyperDX) - 최종 목적지
+  # Note: otlphttp exporter를 사용합니다 (HyperDX는 OTLP 프로토콜을 받습니다)
+  otlphttp/clickstack:
+    endpoint: http://clickstack:4318
+    headers:
+      authorization: "2ce0b5fc-7ce2-4c48-82a9-6487c6a17a8e"
+
+  # 디버깅용 (선택사항 - 문제 해결 시 활성화)
+  # debug:
+  #   verbosity: detailed
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+
+  pipelines:
+    # Traces: tail-based sampling 적용
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, tail_sampling, batch]
+      exporters: [otlphttp/clickstack]
+
+    # Metrics: 샘플링 없이 모두 전달
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/clickstack]
+
+    # ===========================================================================
+    # Logs: routing connector를 통한 severity 기반 샘플링
+    # ===========================================================================
+    # 1. logs (entry): OTLP에서 로그 수신 → routing connector로 전달
+    # 2. logs/errors: ERROR 이상 → 100% 보존 (샘플링 없음)
+    # 3. logs/normal: INFO, DEBUG, WARN → 10% 샘플링
+    # ===========================================================================
+
+    # Entry pipeline: 로그를 severity에 따라 분기
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [routing/logs]
+
+    # Error logs: 100% 보존 (ERROR, FATAL)
+    logs/errors:
+      receivers: [routing/logs]
+      processors: [batch]
+      exporters: [otlphttp/clickstack]
+
+    # Normal logs: 10% 샘플링 (TRACE, DEBUG, INFO, WARN)
+    logs/normal:
+      receivers: [routing/logs]
+      processors: [probabilistic_sampler/logs, batch]
+      exporters: [otlphttp/clickstack]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888

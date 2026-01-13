@@ -1,4 +1,9 @@
-data
+data/clickstack/clickhouse
+data/clickstack/log
+data/clickstack/mongodb
+data/mongodb
+data/postgres
+data/redis
 backend/dist
 backend/node_modules
 backend/.env

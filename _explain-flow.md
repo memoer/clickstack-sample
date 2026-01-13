@@ -1,6 +1,7 @@
 # ClickStack 데이터 플로우 설명서
 
 이 문서는 **Logs, Metrics, Traces, Session Replay** 데이터가 어떻게 ClickStack을 통해 ClickHouse에 저장되는지 설명합니다.
+디테일한 flow보단 전체적으로 개략적인 flow를 설명합니다.
 
 ## 목차
 
@@ -922,18 +923,18 @@ tail_sampling:
       status_code:
         status_codes: [ERROR]
 
-    # 2. 지연 시간이 긴 트레이스 보존 (latency > 1s)
+    # 2. 지연 시간이 긴 트레이스 보존 (latency > 2s)
     - name: latency-policy
       type: latency
       latency:
-        threshold_ms: 1000
+        threshold_ms: 2000
 
     # 3. HTTP 에러 코드 보존 (4xx, 5xx)
     - name: http-error-policy
       type: string_attribute
       string_attribute:
         key: http.response.status_code
-        values: ["400", "401", "403", "404", "500", "502", "503", "504"]
+        values: ["400", "500", "502", "503", "504"]
 
     # 4. 정상 트레이스는 10% 샘플링
     - name: probabilistic-policy
@@ -1016,11 +1017,116 @@ Tail-Based 해결:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## Log Sampling 아키텍처
+
+Trace 샘플링과 별도로, 로그도 severity 기반 샘플링이 적용됩니다.
+
+### 왜 Logs에는 Tail-Based Sampling을 사용하지 않는가?
+
+| 측면 | Traces | Logs |
+|------|--------|------|
+| **데이터 구조** | 부모-자식 관계 (TraceId로 연결) | 독립적인 이벤트 |
+| **결정 시점** | 전체 트레이스 완료 후 | 즉시 결정 가능 |
+| **샘플링 방식** | `tail_sampling` processor | `routing` connector + `probabilistic_sampler` |
+
+로그는 트레이스와 달리 스팬 간의 부모-자식 관계가 없으므로, 완료를 기다릴 필요 없이 severity에 따라 즉시 라우팅할 수 있습니다.
+
+### Log Sampling 플로우
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Backend (NestJS)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  100% Logs 생성                                                      │
+│  - logger.info("Task created")  → severity: INFO (9)                │
+│  - logger.error("DB failed")    → severity: ERROR (17)              │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼ OTLP gRPC (4317)
+┌─────────────────────────────────────────────────────────────────────┐
+│                   External OTEL Collector                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  logs pipeline (entry):                                              │
+│    receivers: [otlp]                                                 │
+│    processors: [memory_limiter]                                      │
+│    exporters: [routing/logs]  ← Connector로 분기                     │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │                  routing/logs Connector                      │    │
+│  │                                                              │    │
+│  │  condition: severity_number >= SEVERITY_NUMBER_ERROR (17)   │    │
+│  │                                                              │    │
+│  │       severity >= ERROR         severity < ERROR            │    │
+│  │            │                          │                      │    │
+│  │            ▼                          ▼                      │    │
+│  │      logs/errors               logs/normal                   │    │
+│  │      (100% 보존)               (10% 샘플링)                  │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  logs/errors pipeline:                                               │
+│    receivers: [routing/logs]                                         │
+│    processors: [batch]                                               │
+│    exporters: [otlphttp/clickstack]                                  │
+│                                                                      │
+│  logs/normal pipeline:                                               │
+│    receivers: [routing/logs]                                         │
+│    processors: [probabilistic_sampler/logs, batch]  ← 10% 샘플링    │
+│    exporters: [otlphttp/clickstack]                                  │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼ OTLP HTTP (4318)
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ClickStack (HyperDX)                          │
+├─────────────────────────────────────────────────────────────────────┤
+│  - ERROR/FATAL 로그: 100% 저장 (중요 이슈 절대 누락 없음)            │
+│  - INFO/DEBUG/WARN 로그: ~10% 저장 (스토리지 최적화)                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Severity Number 매핑
+
+| Log Level | Severity Number | 라우팅 결과 |
+|-----------|----------------|------------|
+| TRACE | 1-4 | logs/normal → 10% 샘플링 |
+| DEBUG | 5-8 | logs/normal → 10% 샘플링 |
+| INFO | 9-12 | logs/normal → 10% 샘플링 |
+| WARN | 13-16 | logs/normal → 10% 샘플링 |
+| **ERROR** | 17-20 | **logs/errors → 100% 보존** |
+| **FATAL** | 21-24 | **logs/errors → 100% 보존** |
+
+### Log Sampling 설정
+
+```yaml
+# Probabilistic Sampler (정상 로그용)
+processors:
+  probabilistic_sampler/logs:
+    sampling_percentage: 10
+    hash_seed: 42
+
+# Routing Connector (severity 기반 분기)
+connectors:
+  routing/logs:
+    default_pipelines: [logs/normal]
+    error_mode: ignore
+    table:
+      - context: log
+        condition: severity_number >= SEVERITY_NUMBER_ERROR
+        pipelines: [logs/errors]
+```
+
+> **Note**: `context: log`를 지정해야 `severity_number` 필드에 접근할 수 있습니다.
+
+---
+
 ### 설정 파일
 
 | 파일 | 용도 |
 |------|------|
-| `otel-collector-config.yaml` | 외부 Collector 설정 (tail-based sampling 정책) |
+| `otel-collector-config.yaml` | 외부 Collector 설정 (tail-based sampling + log sampling 정책) |
 | `docker-compose.db.yml` | 서비스 정의 (otel-collector, clickstack) |
 | `backend/.env` | SDK 엔드포인트 설정 (`otel-collector:4317`) |
 

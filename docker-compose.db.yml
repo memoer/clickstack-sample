@@ -48,9 +48,9 @@ services:
       - "4317"
       - "4318"
     volumes:
-      - ./data/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
-      - ./data/mongo:/data/db                    # 사용자 계정, 대시보드, 알림 설정
-      - ./data/log:/var/log                      # clickhouse, hyperdx 관련 로그
+      - ./data/clickstack/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
+      - ./data/clickstack/mongodb:/data/db                    # 사용자 계정, 대시보드, 알림 설정
+      - ./data/clickstack/log:/var/log                      # clickhouse, hyperdx 관련 로그
     healthcheck:
       # HyperDX doesn't have /health endpoint, check if UI is accessible
       test: ["CMD", "curl", "-sf", "http://localhost:8080/"]

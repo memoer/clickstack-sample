@@ -7,11 +7,12 @@
 1. [구성 개요](#구성-개요)
 2. [Receivers (수신기)](#receivers-수신기)
 3. [Processors (처리기)](#processors-처리기)
-4. [Exporters (내보내기)](#exporters-내보내기)
-5. [Extensions (확장)](#extensions-확장)
-6. [Service (서비스)](#service-서비스)
-7. [설정 변경 가이드](#설정-변경-가이드)
-8. [문제 해결](#문제-해결)
+4. [Connectors (연결기)](#connectors-연결기)
+5. [Exporters (내보내기)](#exporters-내보내기)
+6. [Extensions (확장)](#extensions-확장)
+7. [Service (서비스)](#service-서비스)
+8. [설정 변경 가이드](#설정-변경-가이드)
+9. [문제 해결](#문제-해결)
 
 ---
 
@@ -24,12 +25,16 @@
 │   Receivers        Processors              Exporters                 │
 │   (데이터 수신)     (데이터 처리)            (데이터 전송)             │
 │                                                                      │
-│   ┌────────┐      ┌──────────────┐        ┌────────────┐            │
-│   │  OTLP  │ ──►  │memory_limiter│ ──►    │ClickHouse  │            │
-│   │ (gRPC) │      └──────────────┘        │(ClickStack)│            │
-│   │ (HTTP) │             │                └────────────┘            │
+│   ┌────────┐      ┌──────────────┐        ┌──────────────────┐      │
+│   │  OTLP  │ ──►  │memory_limiter│ ──►    │ otlphttp/        │      │
+│   │ (gRPC) │      └──────────────┘        │ clickstack       │      │
+│   │ (HTTP) │             │                └──────────────────┘      │
 │   └────────┘      ┌──────────────┐                                  │
 │                   │tail_sampling │  (traces only)                   │
+│                   └──────────────┘                                  │
+│                          │                                          │
+│                   ┌──────────────┐                                  │
+│                   │routing/logs  │  (logs - severity routing)       │
 │                   └──────────────┘                                  │
 │                          │                                          │
 │                   ┌──────────────┐                                  │
@@ -42,9 +47,11 @@
 
 | Pipeline | Receivers | Processors | Exporters |
 |----------|-----------|------------|-----------|
-| **traces** | otlp | memory_limiter → tail_sampling → batch | clickhouse |
-| **metrics** | otlp | memory_limiter → batch | clickhouse |
-| **logs** | otlp | memory_limiter → batch | clickhouse |
+| **traces** | otlp | memory_limiter → tail_sampling → batch | otlphttp/clickstack |
+| **metrics** | otlp | memory_limiter → batch | otlphttp/clickstack |
+| **logs** (entry) | otlp | memory_limiter | routing/logs |
+| **logs/errors** | routing/logs | batch | otlphttp/clickstack |
+| **logs/normal** | routing/logs | probabilistic_sampler/logs → batch | otlphttp/clickstack |
 
 ---
 
@@ -136,7 +143,7 @@ processors:
 | `send_batch_size` | 512 | 이 수만큼 모이면 즉시 전송 |
 | `send_batch_max_size` | 1024 | 배치 최대 크기 (초과 시 분할) |
 
-### 3. Tail Sampling (테일 기반 샘플링)
+### 3. Tail Sampling (테일 기반 샘플링) - Traces용
 
 **이 프로젝트의 핵심 설정입니다.** 트레이스가 완료된 후 샘플링 여부를 결정합니다.
 
@@ -236,6 +243,96 @@ policies:
      │ 90% → 드롭
 ```
 
+### 4. Probabilistic Sampler (확률적 샘플링) - Logs용
+
+정상 로그(ERROR 미만)에 대해 10% 샘플링을 적용합니다.
+
+```yaml
+processors:
+  probabilistic_sampler/logs:
+    sampling_percentage: 10    # 10% 샘플링
+    hash_seed: 42              # 일관된 샘플링을 위한 시드
+```
+
+| 설정 | 값 | 설명 |
+|------|-----|------|
+| `sampling_percentage` | 10 | 통과시킬 로그 비율 (%) |
+| `hash_seed` | 42 | 동일 로그가 항상 같은 결과를 얻도록 |
+
+> **Note**: `tail_sampling`과 달리 `probabilistic_sampler`는 즉시 결정을 내립니다. 로그는 트레이스와 달리 부모-자식 관계가 없기 때문입니다.
+
+---
+
+## Connectors (연결기)
+
+파이프라인 간 데이터를 라우팅하는 컴포넌트입니다.
+
+### Routing Connector (로그 라우팅)
+
+로그를 severity에 따라 다른 파이프라인으로 분기합니다.
+
+```yaml
+connectors:
+  routing/logs:
+    default_pipelines: [logs/normal]    # 기본: 정상 로그 파이프라인
+    error_mode: ignore                   # 에러 무시
+    table:
+      # ERROR 이상 (severity_number >= 17) → 에러 파이프라인
+      - context: log
+        condition: severity_number >= SEVERITY_NUMBER_ERROR
+        pipelines: [logs/errors]
+```
+
+#### 설정 설명
+
+| 설정 | 값 | 설명 |
+|------|-----|------|
+| `default_pipelines` | `[logs/normal]` | 조건에 매칭되지 않으면 여기로 |
+| `context` | `log` | 로그 컨텍스트에서 필드 접근 |
+| `condition` | OTTL 표현식 | 라우팅 조건 |
+| `SEVERITY_NUMBER_ERROR` | 17 | OpenTelemetry ERROR 레벨 |
+
+#### Severity Number 참조
+
+| 레벨 | 숫자 범위 | 라우팅 결과 |
+|------|----------|------------|
+| TRACE | 1-4 | logs/normal (10% 샘플링) |
+| DEBUG | 5-8 | logs/normal (10% 샘플링) |
+| INFO | 9-12 | logs/normal (10% 샘플링) |
+| WARN | 13-16 | logs/normal (10% 샘플링) |
+| ERROR | 17-20 | logs/errors (100% 보존) |
+| FATAL | 21-24 | logs/errors (100% 보존) |
+
+#### 로그 샘플링 플로우
+
+```
+OTLP Logs 수신
+       │
+       ▼
+┌──────────────────┐
+│  routing/logs    │
+│  (severity 분기)  │
+└────────┬─────────┘
+         │
+   ┌─────┴─────┐
+   │           │
+   ▼           ▼
+ERROR+      INFO/DEBUG/WARN
+   │           │
+   │    ┌──────────────────┐
+   │    │probabilistic     │
+   │    │_sampler/logs     │
+   │    │  (10% 샘플링)     │
+   │    └────────┬─────────┘
+   │             │
+   ▼             ▼
+100% 보존     10% 보존
+   │             │
+   └──────┬──────┘
+          ▼
+   otlphttp/clickstack
+```
+
 ---
 
 ## Exporters (내보내기)
@@ -244,7 +341,7 @@ policies:
 
 ```yaml
 exporters:
-  clickhouse:
+  otlphttp/clickstack:
     endpoint: http://clickstack:4318
     headers:
       authorization: "2ce0b5fc-7ce2-4c48-82a9-6487c6a17a8e"
@@ -254,6 +351,8 @@ exporters:
 |------|-----|------|
 | `endpoint` | `http://clickstack:4318` | ClickStack의 OTLP HTTP 엔드포인트 |
 | `headers.authorization` | API 키 | HyperDX 인증 토큰 |
+
+> **Note**: ClickStack(HyperDX)는 OTLP 프로토콜을 사용하므로 `otlphttp` exporter를 사용합니다.
 
 ### 디버그 Exporter (선택사항)
 
@@ -310,23 +409,41 @@ service:
   extensions: [health_check, pprof, zpages]
 
   pipelines:
+    # Traces: tail-based sampling 적용
     traces:
       receivers: [otlp]
       processors: [memory_limiter, tail_sampling, batch]
-      exporters: [clickhouse]
+      exporters: [otlphttp/clickstack]
 
+    # Metrics: 샘플링 없이 모두 전달
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [clickhouse]
+      exporters: [otlphttp/clickstack]
 
+    # Logs (Entry): routing connector로 분기
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
-      exporters: [clickhouse]
+      processors: [memory_limiter]
+      exporters: [routing/logs]
+
+    # Error Logs: 100% 보존
+    logs/errors:
+      receivers: [routing/logs]
+      processors: [batch]
+      exporters: [otlphttp/clickstack]
+
+    # Normal Logs: 10% 샘플링
+    logs/normal:
+      receivers: [routing/logs]
+      processors: [probabilistic_sampler/logs, batch]
+      exporters: [otlphttp/clickstack]
 ```
 
-**중요:** `tail_sampling`은 **traces 파이프라인에만** 적용됩니다. Metrics와 Logs는 100% 전달됩니다.
+**샘플링 요약:**
+- **Traces**: tail_sampling으로 에러 100%, 정상 10%
+- **Metrics**: 샘플링 없이 100% 전달
+- **Logs**: routing connector로 ERROR+ 100%, 나머지 10%
 
 ### Collector 자체 텔레메트리
 
@@ -362,7 +479,7 @@ curl http://localhost:8888/metrics | grep otelcol
 
 ## 설정 변경 가이드
 
-### 샘플링 비율 변경
+### 트레이스 샘플링 비율 변경
 
 ```yaml
 # 10% → 20%로 변경
@@ -370,6 +487,15 @@ curl http://localhost:8888/metrics | grep otelcol
   type: probabilistic
   probabilistic:
     sampling_percentage: 20   # 변경
+```
+
+### 로그 샘플링 비율 변경
+
+```yaml
+# 10% → 30%로 변경
+probabilistic_sampler/logs:
+  sampling_percentage: 30     # 변경
+  hash_seed: 42
 ```
 
 ### 지연 임계값 변경
@@ -391,6 +517,8 @@ curl http://localhost:8888/metrics | grep otelcol
     key: http.response.status_code
     values:
       - "400"
+      - "401"    # 추가
+      - "403"    # 추가
       - "500"
       - "502"
       - "503"
@@ -454,12 +582,17 @@ curl -s http://localhost:8888/metrics | grep "receiver_accepted"
 ### 3. 샘플링이 작동하지 않음
 
 ```bash
-# 샘플링 통계 확인
+# 트레이스 샘플링 통계 확인
 curl -s http://localhost:8888/metrics | grep "tail_sampling"
+
+# 로그 샘플링 통계 확인
+curl -s http://localhost:8888/metrics | grep "probabilistic_sampler"
 
 # 확인할 메트릭:
 # - policy_execution_count_total: 정책 실행 횟수
 # - count_traces_sampled_total: 샘플링된 트레이스 수
+# - processor_incoming_items_total: 들어온 항목 수
+# - processor_outgoing_items_total: 나간 항목 수
 ```
 
 ### 4. 메모리 사용량 확인
@@ -483,11 +616,15 @@ curl -s http://localhost:8888/metrics | grep "memory"
 │                                                                      │
 │  processors:                                                         │
 │    ├── memory_limiter (512MB 제한)                                  │
-│    ├── tail_sampling (에러 100%, 정상 10%)                          │
+│    ├── tail_sampling (에러 100%, 정상 10%) - traces                 │
+│    ├── probabilistic_sampler/logs (10%) - logs                      │
 │    └── batch (5초/512개 단위)                                       │
 │                                                                      │
+│  connectors:                                                         │
+│    └── routing/logs (severity 기반 분기)                            │
+│                                                                      │
 │  exporters:                                                          │
-│    └── clickhouse (http://clickstack:4318)                          │
+│    └── otlphttp/clickstack (http://clickstack:4318)                 │
 │                                                                      │
 │  extensions:                                                         │
 │    ├── health_check (:13133)                                        │
@@ -496,9 +633,11 @@ curl -s http://localhost:8888/metrics | grep "memory"
 │                                                                      │
 │  service:                                                            │
 │    ├── pipelines:                                                    │
-│    │   ├── traces  → [memory_limiter, tail_sampling, batch]         │
-│    │   ├── metrics → [memory_limiter, batch]                        │
-│    │   └── logs    → [memory_limiter, batch]                        │
+│    │   ├── traces     → [memory_limiter, tail_sampling, batch]      │
+│    │   ├── metrics    → [memory_limiter, batch]                     │
+│    │   ├── logs       → [memory_limiter] → routing/logs             │
+│    │   ├── logs/errors→ [batch]                      (100% 보존)    │
+│    │   └── logs/normal→ [probabilistic_sampler, batch] (10% 샘플)   │
 │    └── telemetry:                                                    │
 │        └── metrics → prometheus (:8888)                             │
 │                                                                      │
@@ -511,5 +650,7 @@ curl -s http://localhost:8888/metrics | grep "memory"
 
 - [OpenTelemetry Collector Configuration](https://opentelemetry.io/docs/collector/configuration/)
 - [Tail Sampling Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
+- [Probabilistic Sampler Processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/probabilisticsamplerprocessor)
+- [Routing Connector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector)
 - [Memory Limiter Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/memorylimiterprocessor)
 - [Batch Processor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor)

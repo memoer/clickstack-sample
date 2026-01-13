@@ -10,7 +10,7 @@ import { GlobalExceptionFilter } from "./filters/http-exception.filter";
 import { TracingInterceptor } from "./interceptors/tracing.interceptor";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   // Global Interceptor & Filter
   app.useGlobalInterceptors(new TracingInterceptor());
@@ -27,7 +27,7 @@ async function bootstrap() {
 
   const logger = new Logger("Bootstrap");
   logger.info(
-    { port, env: process.env.NODE_ENV || "dev" },
+    { port, env: process.env.NODE_ENV },
     `🚀 Application is running ${port}`
   );
 }

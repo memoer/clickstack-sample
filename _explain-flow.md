@@ -14,6 +14,7 @@
 4. [OTLP 프로토콜](#otlp-프로토콜)
 5. [ClickHouse 스키마](#clickhouse-스키마)
 6. [코드에서의 구현](#코드에서의-구현)
+7. [Tail-Based Sampling 아키텍처](#tail-based-sampling-아키텍처)
 
 ---
 
@@ -620,16 +621,21 @@ HyperDX.recordException(new Error('Something went wrong'), {
 
 ## OTLP 프로토콜
 
+> **이 프로젝트의 선택**: Backend는 **gRPC (4317)**를 사용합니다.
+> 성능 우위와 persistent connection의 장점을 활용합니다.
+> Frontend는 브라우저 환경이므로 **HTTP (4318)**를 사용합니다.
+
 ### OTLP gRPC vs HTTP 비교
 
 | 특성 | OTLP gRPC (4317) | OTLP HTTP (4318) |
 |------|------------------|------------------|
 | 프로토콜 | HTTP/2 + Protobuf | HTTP/1.1 + JSON/Protobuf |
-| 성능 | 더 빠름 | 상대적으로 느림 |
-| 연결 | Persistent | Request per connection |
+| 성능 | 더 빠름 (바이너리, 멀티플렉싱) | 상대적으로 느림 |
+| 연결 | Persistent (연결 재사용) | Request per connection |
 | 브라우저 지원 | ❌ | ✅ |
-| 디버깅 | 어려움 | 쉬움 (JSON) |
+| 디버깅 | 어려움 (바이너리) | 쉬움 (JSON) |
 | 방화벽 | 일부 환경에서 차단 | 대부분 통과 |
+| **이 프로젝트** | **Backend 사용** | **Frontend 사용** |
 
 ### 엔드포인트 구조
 
@@ -644,6 +650,22 @@ gRPC (4317):
   opentelemetry.proto.collector.metrics.v1.MetricsService/Export
   opentelemetry.proto.collector.logs.v1.LogsService/Export
 ```
+
+### NPM 패키지 (gRPC vs HTTP)
+
+```bash
+# gRPC Exporters (이 프로젝트에서 사용)
+@opentelemetry/exporter-trace-otlp-grpc
+@opentelemetry/exporter-metrics-otlp-grpc
+@opentelemetry/exporter-logs-otlp-grpc
+
+# HTTP Exporters (브라우저 또는 방화벽 제한 환경용)
+@opentelemetry/exporter-trace-otlp-http
+@opentelemetry/exporter-metrics-otlp-http
+@opentelemetry/exporter-logs-otlp-http
+```
+
+> **gRPC 전환 방법**: 패키지를 `-grpc`로 변경하고, exporter URL에서 경로(`/v1/traces` 등)를 제거하면 됩니다. gRPC는 서비스 메서드를 사용하므로 별도의 경로 지정이 필요 없습니다.
 
 ---
 
@@ -699,18 +721,40 @@ import './tracing';
 
 // 2. tracing.ts - Vanilla OpenTelemetry (벤더 중립!)
 import { NodeSDK } from '@opentelemetry/sdk-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
+import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
+
+// gRPC는 URL 경로가 필요 없음 - 엔드포인트만 지정
+const traceExporter = new OTLPTraceExporter({
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,  // e.g., http://otel-collector:4317
+  headers,
+});
+
+const metricExporter = new OTLPMetricExporter({
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,
+  headers,
+});
+
+const logExporter = new OTLPLogExporter({
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,
+  headers,
+});
 
 const sdk = new NodeSDK({
-  resource: new Resource({
-    [ATTR_SERVICE_NAME]: 'my-backend',
+  resource: resourceFromAttributes({
+    [ATTR_SERVICE_NAME]: SERVICE_NAME,
+    [ATTR_SERVICE_VERSION]: SERVICE_VERSION,
   }),
-  traceExporter: new OTLPTraceExporter({
-    url: `${OTEL_ENDPOINT}/v1/traces`,
+  traceExporter,
+  metricReader: new PeriodicExportingMetricReader({
+    exporter: metricExporter,
+    exportIntervalMillis: 5_000,
   }),
-  // ... metrics, logs exporters
+  logRecordProcessors: [
+    new BatchLogRecordProcessor(logExporter),
+  ],
+  // ... auto-instrumentations
 });
 sdk.start();
 
@@ -826,9 +870,182 @@ try {
 
 ---
 
+## Tail-Based Sampling 아키텍처
+
+### 듀얼 Collector 구조
+
+`hyperdx-all-in-one` 이미지에는 이미 **내장 OTEL Collector**가 포함되어 있습니다. 우리는 tail-based sampling을 위해 **외부 Collector**를 추가했으므로, 현재 두 개의 Collector가 직렬로 연결되어 있습니다:
+
+```
+┌──────────┐     ┌─────────────────────┐     ┌─────────────────────────────────────┐
+│ Backend  │ ──► │ External Collector  │ ──► │      hyperdx-all-in-one             │
+│          │     │ (tail sampling)     │     │  ┌─────────────────────────────────┐│
+│  100%    │     │                     │     │  │ Embedded OTEL Collector        ││
+│ traces   │     │  Policies:          │     │  │ (ingestion only)               ││
+│          │     │  - ERROR → 100%     │     │  └──────────┬──────────────────────┘│
+│          │     │  - Latency >1s      │     │             ▼                       │
+│          │     │  - HTTP 4xx/5xx     │     │  ┌─────────────────────────────────┐│
+│          │     │  - Normal → 10%     │     │  │       ClickHouse               ││
+│          │     │                     │     │  └─────────────────────────────────┘│
+└──────────┘     └─────────────────────┘     └─────────────────────────────────────┘
+    gRPC:4317         ~10-20% 전달              HTTP:4318 (내부)
+```
+
+### 왜 두 개의 Collector가 필요한가?
+
+| 측면 | External Collector | Embedded Collector |
+|------|-------------------|-------------------|
+| **역할** | 샘플링, 필터링 | 데이터 수집, 저장 |
+| **CPU 사용** | 높음 (샘플링 로직) | 낮음 (단순 전달) |
+| **설정** | 우리가 제어 | HyperDX 관리 |
+| **확장성** | 독립적 스케일링 가능 | HyperDX와 함께 |
+
+### 이 구조의 장점
+
+1. **관심사의 분리**: 샘플링 로직이 저장소와 분리됨
+2. **유연성**: HyperDX 설정 변경 없이 샘플링 정책 수정 가능
+3. **확장성**: 외부 Collector를 독립적으로 스케일링 가능
+4. **일반적인 패턴**: 프로덕션 관측성 파이프라인의 표준 구조
+
+### Tail-Based Sampling 정책
+
+외부 Collector (`otel-collector-config.yaml`)에서 다음 정책을 적용합니다:
+
+```yaml
+tail_sampling:
+  decision_wait: 10s        # 트레이스 완료 대기 시간
+  num_traces: 50000         # 메모리에 보관할 최대 트레이스 수
+  policies:
+    # 1. 에러가 있는 트레이스는 항상 보존 (100%)
+    - name: errors-policy
+      type: status_code
+      status_code:
+        status_codes: [ERROR]
+
+    # 2. 지연 시간이 긴 트레이스 보존 (latency > 1s)
+    - name: latency-policy
+      type: latency
+      latency:
+        threshold_ms: 1000
+
+    # 3. HTTP 에러 코드 보존 (4xx, 5xx)
+    - name: http-error-policy
+      type: string_attribute
+      string_attribute:
+        key: http.response.status_code
+        values: ["400", "401", "403", "404", "500", "502", "503", "504"]
+
+    # 4. 정상 트레이스는 10% 샘플링
+    - name: probabilistic-policy
+      type: probabilistic
+      probabilistic:
+        sampling_percentage: 10
+```
+
+### Head-Based vs Tail-Based Sampling
+
+| 측면 | Head-Based (SDK) | Tail-Based (Collector) |
+|------|-----------------|------------------------|
+| **결정 시점** | Span 시작 시 | Trace 완료 후 |
+| **에러 캡처** | 놓칠 수 있음 | **100% 보장** |
+| **네트워크 트래픽** | 감소 (소스에서 필터링) | 100% 전송 |
+| **트레이스 완전성** | 부분적 (부모 span 누락 가능) | **완전함** |
+| **메모리 사용** | 낮음 | 높음 (대기 중인 트레이스 보관) |
+
+```
+Head-Based 문제점:
+
+  Parent Span Start ─────────────────────────► Parent End (10% 확률로 drop)
+       │
+       └── Child Span Start ──► Error! ──► Child End (error이므로 keep)
+
+  결과: Child span만 있고 Parent span이 없는 불완전한 트레이스!
+
+Tail-Based 해결:
+
+  Parent Span Start ─────────────────────────► Parent End ──┐
+       │                                                    │
+       └── Child Span Start ──► Error! ──► Child End ──────┼─► Collector
+                                                            │
+                                            decision_wait 후 │
+                                            전체 트레이스 평가 │
+                                                            ▼
+                                            "에러 있음 → 전체 보존!"
+```
+
+### 데이터 플로우 요약
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Backend (NestJS)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  100% Traces 생성 (샘플링 없음)                                       │
+│  → 모든 요청에 대해 완전한 트레이스 데이터 생성                        │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼ OTLP gRPC (4317)
+┌─────────────────────────────────────────────────────────────────────┐
+│                   External OTEL Collector                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  Tail-Based Sampling:                                                │
+│  - 10초 대기 (decision_wait)                                         │
+│  - 트레이스 완료 후 정책 평가                                         │
+│  - ERROR, 고지연, HTTP 에러 → 100% 보존                              │
+│  - 정상 → 10% 샘플링                                                 │
+│                                                                      │
+│  결과: ~10-20% 데이터만 다음 단계로 전달                              │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼ OTLP HTTP (4318)
+┌─────────────────────────────────────────────────────────────────────┐
+│                   HyperDX (hyperdx-all-in-one)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ Embedded OTEL Collector                                      │    │
+│  │ - 이미 샘플링된 데이터 수신                                   │    │
+│  │ - 추가 처리 없이 ClickHouse로 전달                            │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                              │                                       │
+│                              ▼                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ ClickHouse                                                   │    │
+│  │ - 샘플링된 트레이스만 저장                                    │    │
+│  │ - 스토리지 80-90% 절감                                        │    │
+│  │ - 에러 트레이스는 100% 보존                                   │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 설정 파일
+
+| 파일 | 용도 |
+|------|------|
+| `otel-collector-config.yaml` | 외부 Collector 설정 (tail-based sampling 정책) |
+| `docker-compose.db.yml` | 서비스 정의 (otel-collector, clickstack) |
+| `backend/.env` | SDK 엔드포인트 설정 (`otel-collector:4317`) |
+
+### 검증 방법
+
+```bash
+# 1. 서비스 시작
+docker-compose -f docker-compose.db.yml up -d
+
+# 2. Collector 상태 확인
+curl http://localhost:13133/  # Health check
+curl http://localhost:8888/metrics  # Collector 메트릭
+
+# 3. HyperDX UI에서 확인
+# http://localhost:8080
+# - 에러 요청 → 항상 표시됨
+# - 정상 요청 → ~10%만 표시됨
+```
+
+---
+
 ## 참고 자료
 
 - [ClickStack 공식 문서](https://clickhouse.com/docs/use-cases/observability/clickstack/overview)
 - [OpenTelemetry 스펙](https://opentelemetry.io/docs/specs/otel/)
+- [OpenTelemetry Collector Tail Sampling](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor)
 - [HyperDX GitHub](https://github.com/hyperdxio/hyperdx)
 - [ClickHouse 문서](https://clickhouse.com/docs)

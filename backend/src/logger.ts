@@ -61,7 +61,7 @@ const transport =
       };
 
 const rootLogger: PinoLogger = pino({
-  level: process.env.LOG_LEVEL || "info",
+  level: process.env.LOG_LEVEL,
 
   mixin: traceContextMixin,
 

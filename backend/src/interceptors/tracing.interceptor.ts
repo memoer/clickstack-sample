@@ -60,6 +60,7 @@ export class TracingInterceptor implements NestInterceptor {
             type: "request",
             method,
             url,
+            route,
             userId,
             ...requestMeta,
           },
@@ -71,15 +72,7 @@ export class TracingInterceptor implements NestInterceptor {
             .handle()
             .pipe(
               tap(response => {
-                this.onSuccess(
-                  span,
-                  startTime,
-                  method,
-                  url,
-                  route,
-                  userId,
-                  response
-                );
+                this.onSuccess(span, startTime, method, url, userId);
               }),
               catchError(error => {
                 this.onError(
@@ -87,7 +80,6 @@ export class TracingInterceptor implements NestInterceptor {
                   startTime,
                   method,
                   url,
-                  route,
                   requestBody,
                   userId,
                   error
@@ -192,13 +184,10 @@ export class TracingInterceptor implements NestInterceptor {
     startTime: number,
     method: string,
     url: string,
-    route: string,
-    userId: string | null,
-    response: unknown
+    userId: string | null
   ): void {
     const duration = Date.now() - startTime;
     const statusCode = 200;
-    const responseBody = this.safeStringify(response);
 
     span.setStatus({ code: SpanStatusCode.OK });
     span.setAttribute("http.duration_ms", duration);
@@ -212,7 +201,6 @@ export class TracingInterceptor implements NestInterceptor {
         duration,
         statusCode,
         userId,
-        responseBody,
       },
       `←RESPONSE ${method} ${url} ${duration}ms`
     );
@@ -223,7 +211,6 @@ export class TracingInterceptor implements NestInterceptor {
     startTime: number,
     method: string,
     url: string,
-    route: string,
     requestBody: string | undefined,
     userId: string | null,
     error: Error
@@ -240,18 +227,19 @@ export class TracingInterceptor implements NestInterceptor {
 
     span.recordException(error);
 
-    this.logger.error(
-      {
-        type: "error",
-        err: error,
-        method,
-        url,
-        duration,
-        statusCode,
-        userId,
-        requestBody,
-      },
-      `← ERROR ${method} ${url} ${duration}ms`
-    );
+    const attributes: Record<string, unknown> = {
+      type: "error",
+      err: error,
+      method,
+      url,
+      duration,
+      statusCode,
+      userId,
+    };
+    if (statusCode >= 500 || statusCode == 400) {
+      attributes.requestBody = requestBody;
+    }
+
+    this.logger.error(attributes, `!ERROR ${method} ${url} ${duration}ms`);
   }
 }

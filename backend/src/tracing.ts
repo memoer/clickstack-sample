@@ -12,13 +12,14 @@
  * - 등등...
  *
  * 전환 방법: OTEL_EXPORTER_OTLP_ENDPOINT 환경변수만 변경하면 됩니다!
+ *
  */
 
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-grpc";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-grpc";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { RuntimeNodeInstrumentation } from "@opentelemetry/instrumentation-runtime-node";
@@ -37,7 +38,7 @@ const OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT; // 
 const SERVICE_NAME = process.env.OTEL_SERVICE_NAME; // 서비스 정보
 const SERVICE_VERSION = process.env.SERVICE_VERSION; // 서비스 정보
 const DEPLOYMENT_ENV = process.env.NODE_ENV; // 서비스 정보
-const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS || ""; // 인증 헤더 (선택사항 - 벤더에 따라 필요)
+const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS; // 인증 헤더 (선택사항 - 벤더에 따라 필요)
 
 const headers: Record<string, string> = {};
 if (AUTH_HEADER) {
@@ -54,21 +55,22 @@ if (AUTH_HEADER) {
 // Exporters 설정
 // ============================================================================
 
-// Trace Exporter
+// Trace Exporter (gRPC - no URL path needed)
+// SDK는 100% 트레이스를 전송, Collector에서 tail-based sampling 수행
 const traceExporter = new OTLPTraceExporter({
-  url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,
   headers,
 });
 
-// Metric Exporter
+// Metric Exporter (gRPC - no URL path needed)
 const metricExporter = new OTLPMetricExporter({
-  url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics`,
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,
   headers,
 });
 
-// Log Exporter
+// Log Exporter (gRPC - no URL path needed)
 const logExporter = new OTLPLogExporter({
-  url: `${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/logs`,
+  url: OTEL_EXPORTER_OTLP_ENDPOINT,
   headers,
 });
 
@@ -116,7 +118,7 @@ const sdk = new NodeSDK({
         // Skip tracing for OTLP exporter calls
         ignoreOutgoingRequestHook: request => {
           const host = request.hostname || request.host || "";
-          return host.includes("localhost:8080"); // OTLP collector
+          return host.includes("otel-collector"); // OTLP collector
         },
       },
 
@@ -171,7 +173,7 @@ console.log(`   Node.js:     ${process.version}`);
 console.log("");
 console.log("   📝 Logs:    Pino → OTLP → Backend");
 console.log("   📊 Metrics: OpenTelemetry API → OTLP → Backend");
-console.log("   🔍 Traces:  Auto-instrumentation → OTLP → Backend");
+console.log("   🔍 Traces:  100% → Collector (tail-based sampling)");
 console.log("════════════════════════════════════════════════════════════");
 
 // Graceful shutdown

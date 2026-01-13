@@ -1,0 +1,287 @@
+{
+  "version": "0.1.0",
+  "name": "Node.js Runtime Performance Dashboard",
+  "tiles": [
+    {
+      "id": "eventloop-delay-min",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay Min (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "min_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.min"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-max",
+      "x": 6,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay Max (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "max_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.max"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-mean",
+      "x": 12,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay Mean (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "mean_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.mean"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-stddev",
+      "x": 18,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay StdDev (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "stddev_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.stddev"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-p50",
+      "x": 0,
+      "y": 10,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay P50 (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "p50_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.p50"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-p90",
+      "x": 6,
+      "y": 10,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay P90 (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "p90_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.p90"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-delay-p99",
+      "x": 12,
+      "y": 10,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay P99 (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "p99_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.p99"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "eventloop-utilization",
+      "x": 18,
+      "y": 10,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Utilization (%)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 100",
+            "alias": "utilization_pct",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.utilization"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "active-handles",
+      "x": 0,
+      "y": 20,
+      "w": 12,
+      "h": 10,
+      "config": {
+        "name": "Active Handles (libuv)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "handles",
+            "metricType": "gauge",
+            "metricName": "nodejs.active_handles.total"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "active-requests",
+      "x": 12,
+      "y": 20,
+      "w": 12,
+      "h": 10,
+      "config": {
+        "name": "Active Requests (libuv)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "gauge",
+            "metricName": "nodejs.active_requests.total"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    }
+  ],
+  "filters": []
+}

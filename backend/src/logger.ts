@@ -65,11 +65,7 @@ const rootLogger: PinoLogger = pino({
 
   mixin: traceContextMixin,
 
-  base: {
-    service: process.env.OTEL_SERVICE_NAME || "clickstack-demo-backend",
-    version: process.env.SERVICE_VERSION || "1.0.0",
-    env: process.env.NODE_ENV || "dev",
-  },
+  base: {},
 
   timestamp: pino.stdTimeFunctions.isoTime,
 

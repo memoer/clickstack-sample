@@ -29,10 +29,6 @@ import {
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 
-// Note: ATTR_DEPLOYMENT_ENVIRONMENT_NAME is in the incubating subpath export
-// which requires moduleResolution: node16+. Using string literal for compatibility.
-const ATTR_DEPLOYMENT_ENVIRONMENT_NAME = "deployment.environment.name";
-
 // ============================================================================
 // 환경 변수 설정
 // ============================================================================
@@ -85,7 +81,7 @@ const sdk = new NodeSDK({
   resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: SERVICE_VERSION,
-    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: DEPLOYMENT_ENV,
+    "service.env": DEPLOYMENT_ENV,
   }),
 
   // Trace Exporter
@@ -125,11 +121,7 @@ const sdk = new NodeSDK({
       },
 
       "@opentelemetry/instrumentation-pino": {
-        logHook: (span, record) => {
-          record["service.name"] = SERVICE_NAME;
-          record["service.version"] = SERVICE_VERSION;
-          record["service.env"] = DEPLOYMENT_ENV;
-        },
+        logHook: (span, record) => {},
       },
 
       // PostgreSQL (pg) - disabled because Prisma uses its own query engine

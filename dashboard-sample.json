@@ -1,0 +1,417 @@
+{
+  "version": "0.1.0",
+  "name": "ClickStack Monitoring Dashboard",
+  "tiles": [
+    {
+      "id": "http-rpm",
+      "x": 0,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "HTTP Requests Per Minute",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "sum",
+            "metricName": "http.requests.total"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": "Attributes['route']"
+      }
+    },
+    {
+      "id": "http-errors",
+      "x": 6,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "HTTP Errors Per Minute",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "errors",
+            "metricType": "sum",
+            "metricName": "http.requests.total"
+          }
+        ],
+        "where": "Attributes['status'] = 'error'",
+        "whereLanguage": "sql",
+        "groupBy": "Attributes['route']"
+      }
+    },
+    {
+      "id": "http-success",
+      "x": 12,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "HTTP Success Per Minute",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "success",
+            "metricType": "sum",
+            "metricName": "http.requests.total"
+          }
+        ],
+        "where": "Attributes['status'] = 'success'",
+        "whereLanguage": "sql",
+        "groupBy": "Attributes['route']"
+      }
+    },
+    {
+      "id": "http-p95",
+      "x": 18,
+      "y": 0,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "HTTP P95 Latency (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "p95",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "p95_latency_ms",
+            "metricType": "histogram",
+            "metricName": "http.server.request.duration"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": "Attributes['http.route']"
+      }
+    },
+    {
+      "id": "mongodb-rpm-ops",
+      "x": 0,
+      "y": 10,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "MongoDB RPM by Operation",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "sum",
+            "metricName": "db_tasks.operations.total"
+          }
+        ],
+        "where": "Attributes['database'] = 'mongodb'",
+        "whereLanguage": "sql",
+        "groupBy": "Attributes['operation']"
+      }
+    },
+    {
+      "id": "redis-rpm-ops",
+      "x": 8,
+      "y": 10,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "Redis RPM by Operation",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "sum",
+            "metricName": "db_tasks.operations.total"
+          }
+        ],
+        "where": "Attributes['database'] = 'redis'",
+        "whereLanguage": "sql",
+        "groupBy": "Attributes['operation']"
+      }
+    },
+    {
+      "id": "postgres-rpm-ops",
+      "x": 16,
+      "y": 10,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "PostgreSQL RPM by Operation",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "sum",
+            "metricName": "db_tasks.operations.total"
+          }
+        ],
+        "where": "Attributes['database'] = 'postgres'",
+        "whereLanguage": "sql",
+        "groupBy": "Attributes['operation']"
+      }
+    },
+    {
+      "id": "mongodb-latency",
+      "x": 0,
+      "y": 20,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "MongoDB Slow Operations (>1000ms)",
+        "source": "Traces",
+        "displayType": "table",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Duration/1000000",
+            "alias": "avg_latency_ms"
+          },
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "",
+            "alias": "count"
+          }
+        ],
+        "where": "SpanAttributes['db.system'] = 'mongodb' AND Duration > 1000000000",
+        "whereLanguage": "sql",
+        "groupBy": "SpanAttributes['db.operation']",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "id": "redis-latency",
+      "x": 8,
+      "y": 20,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "Redis Slow Operations (>1000ms)",
+        "source": "Traces",
+        "displayType": "table",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Duration/1000000",
+            "alias": "avg_latency_ms"
+          },
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "",
+            "alias": "count"
+          }
+        ],
+        "where": "SpanAttributes['db.system'] = 'redis' AND Duration > 1000000000",
+        "whereLanguage": "sql",
+        "groupBy": "SpanAttributes['db.operation']",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "id": "postgres-latency",
+      "x": 16,
+      "y": 20,
+      "w": 8,
+      "h": 10,
+      "config": {
+        "name": "PostgreSQL Slow Operations (>1000ms)",
+        "source": "Traces",
+        "displayType": "table",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Duration/1000000",
+            "alias": "avg_latency_ms"
+          },
+          {
+            "aggFn": "count",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "",
+            "alias": "count"
+          }
+        ],
+        "where": "SpanAttributes['db.system'] = 'postgresql' AND Duration > 1000000000",
+        "whereLanguage": "sql",
+        "groupBy": "SpanAttributes['db.operation']",
+        "sortOrder": "desc"
+      }
+    },
+    {
+      "id": "nodejs-eventloop-p99",
+      "x": 0,
+      "y": 30,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Delay P99 (ms)",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value * 1000",
+            "alias": "p99_delay_ms",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.delay.p99"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "nodejs-eventloop-util",
+      "x": 6,
+      "y": 30,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Event Loop Utilization",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "utilization",
+            "metricType": "gauge",
+            "metricName": "nodejs.eventloop.utilization"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "nodejs-active-handles",
+      "x": 12,
+      "y": 30,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Active Handles",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "handles",
+            "metricType": "gauge",
+            "metricName": "nodejs.active_handles.total"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    },
+    {
+      "id": "nodejs-active-requests",
+      "x": 18,
+      "y": 30,
+      "w": 6,
+      "h": 10,
+      "config": {
+        "name": "Active Requests",
+        "source": "Metrics",
+        "displayType": "line",
+        "granularity": "1 minute",
+        "markdown": "",
+        "select": [
+          {
+            "aggFn": "avg",
+            "aggCondition": "",
+            "aggConditionLanguage": "lucene",
+            "valueExpression": "Value",
+            "alias": "requests",
+            "metricType": "gauge",
+            "metricName": "nodejs.active_requests.total"
+          }
+        ],
+        "where": "",
+        "whereLanguage": "lucene",
+        "groupBy": ""
+      }
+    }
+  ],
+  "filters": []
+}

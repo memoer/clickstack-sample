@@ -11,7 +11,6 @@ import { catchError, tap } from "rxjs/operators";
 import { trace, SpanStatusCode, context, Span } from "@opentelemetry/api";
 import { Request } from "express";
 import { Logger } from "../logger";
-import { addHttpRequestCounter } from "./tracing.interceptor.metric";
 
 interface RequestMeta {
   ip: string | undefined;
@@ -205,8 +204,6 @@ export class TracingInterceptor implements NestInterceptor {
     span.setAttribute("http.duration_ms", duration);
     span.setAttribute("http.status_code", statusCode);
 
-    addHttpRequestCounter(method, route, statusCode);
-
     this.logger.info(
       {
         type: "response",
@@ -242,8 +239,6 @@ export class TracingInterceptor implements NestInterceptor {
     span.setAttribute("http.status_code", statusCode);
 
     span.recordException(error);
-
-    addHttpRequestCounter(method, route, statusCode);
 
     this.logger.error(
       {

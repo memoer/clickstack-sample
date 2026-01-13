@@ -11,6 +11,7 @@ services:
     image: docker.hyperdx.io/hyperdx/hyperdx-all-in-one
     ports:
       - "8080:8080"   # HyperDX UI
+      - "8123:8123"   # Clickhouse
       - "4317:4317"   # OTLP gRPC
       - "4318:4318"   # OTLP HTTP
       - "9000:9000"   # ClickHouse native port

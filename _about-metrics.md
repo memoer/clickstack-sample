@@ -231,3 +231,44 @@ What are you measuring?
 4. **Gauge callback performance**: Keep Gauge callbacks fast and non-blocking—they run on every scrape interval
 
 5. **Attributes (labels)**: All four types support attributes for dimensional slicing—but high-cardinality attributes (like user IDs) will explode your metric storage
+
+---
+
+## HyperDX Aggregation Functions
+
+When visualizing metrics in HyperDX Chart Explorer, you need to choose an **aggregation function** to combine multiple data points within each time bucket (e.g., 30 seconds).
+
+### Available Aggregations
+
+| Function | Description | Best For |
+|----------|-------------|----------|
+| **Count of Events** | Counts the number of metric data points received | Checking if metrics are being exported (debugging) |
+| **Sum** | Adds up all values in the time bucket | **Counter metrics** (requests, operations, bytes) - shows actual increments |
+| **99th Percentile** | Value below which 99% of data falls | Latency SLOs - worst-case performance |
+| **95th Percentile** | Value below which 95% of data falls | **Recommended for latency** - filters outliers |
+| **90th Percentile** | Value below which 90% of data falls | Less strict latency monitoring |
+| **Median** | 50th percentile (middle value) | "Typical" user experience |
+| **Average** | Arithmetic mean of all values | General overview (can hide spikes) |
+| **Maximum** | Highest value in the bucket | Finding worst-case scenarios, peaks |
+| **Minimum** | Lowest value in the bucket | Finding best-case or floor values |
+| **Count Distinct** | Number of unique values | Counting unique routes, users, etc. |
+| **Any** | Returns any single value (non-deterministic) | Quick spot-check, rarely used |
+| **None** | No aggregation (raw values) | Debugging, seeing individual data points |
+
+### Matching Aggregations to Metric Types
+
+| Metric Type | Recommended Aggregation | Why |
+|-------------|------------------------|-----|
+| Counter (sum) | **Sum** | Shows actual request/event counts per interval |
+| Histogram | **P95** or **Average** | Percentiles for latency, avg for general view |
+| Gauge | **Average** or **Max** | Average for typical state, max for peaks |
+| UpDownCounter | **Average** or **Max** | Current state over the interval |
+
+### Common Mistake: Count vs Sum
+
+```
+❌ count(http.requests.total)  → Counts metric SAMPLES (e.g., "6 data points arrived")
+✅ sum(http.requests.total)    → Sums counter VALUES (e.g., "150 HTTP requests")
+```
+
+**Rule of thumb**: For Counter metrics, always use `Sum` to see actual event counts, not `Count of Events`.

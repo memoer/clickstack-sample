@@ -6,3 +6,7 @@ frontend/dist
 frontend/node_modules
 frontend/.env
 mobile/node_modules
+mobile/vendor
+mobile/ios/build
+mobile/ios/Pods
+mobile/ios/ClickstackMobile*

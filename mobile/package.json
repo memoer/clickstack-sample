@@ -1,0 +1,50 @@
+{
+  "name": "clickstack-demo-mobile",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build-android": "react-native build-android",
+    "run-android": "react-native run-android",
+    "build-ios": "react-native build-ios",
+    "run-ios": "react-native run-ios",
+    "lint": "eslint .",
+    "start": "react-native start",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@hyperdx/otel-react-native": "^0.3.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@react-native/new-app-screen": "^0.83.1",
+    "@react-navigation/native": "^7.1.27",
+    "@react-navigation/native-stack": "^7.9.1",
+    "react": "^19.2.3",
+    "react-native": "^0.83.1",
+    "react-native-config": "^1.6.1",
+    "react-native-device-info": "^15.0.1",
+    "react-native-safe-area-context": "^5.6.2",
+    "react-native-screens": "^4.19.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.6",
+    "@babel/preset-env": "^7.28.6",
+    "@babel/runtime": "^7.28.6",
+    "@react-native-community/cli": "^20.1.0",
+    "@react-native-community/cli-platform-android": "^20.1.0",
+    "@react-native-community/cli-platform-ios": "^20.1.0",
+    "@react-native/babel-preset": "^0.83.1",
+    "@react-native/eslint-config": "^0.83.1",
+    "@react-native/metro-config": "^0.83.1",
+    "@react-native/typescript-config": "^0.83.1",
+    "@types/jest": "^30.0.0",
+    "@types/react": "^19.2.8",
+    "@types/react-test-renderer": "^19.1.0",
+    "eslint": "^8.57.1",
+    "jest": "^30.2.0",
+    "prettier": "^3.7.4",
+    "react-test-renderer": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

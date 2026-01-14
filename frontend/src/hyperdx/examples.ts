@@ -13,19 +13,13 @@ import HyperDX from "@hyperdx/browser";
 // 모든 트레이스/로그에 자동으로 포함되는 속성을 설정합니다.
 // 사용자 식별, 환경 정보 등에 유용합니다.
 
-export function exampleSetGlobalAttributes() {
-  // 사용자 로그인 후 호출
+export function setGlobalAttrs(userId: number) {
   HyperDX.setGlobalAttributes({
-    userId: "user-12345",
-    userEmail: "john@example.com",
-    userName: "John Doe",
-    userPlan: "premium",
-    environment: "production",
+    userId: userId.toString(),
   });
 }
 
-// 로그아웃 시 사용자 정보 제거
-export function exampleClearUserAttributes() {
+export function clearGlobalAttrs() {
   HyperDX.setGlobalAttributes({});
 }
 
@@ -69,9 +63,8 @@ export function exampleToggleNetworkCapture(enable: boolean) {
 }
 
 // ============================================================
-// 4. addAction with structured data - 구조화된 액션 기록
+// 4. addAction, recordException
 // ============================================================
-// recordAction을 더 풍부하게 사용하는 예시입니다.
 
 export function exampleStructuredActions() {
   // 페이지 뷰 추적
@@ -89,10 +82,6 @@ export function exampleStructuredActions() {
   });
 }
 
-// ============================================================
-// 5. recordException with rich context - 상세 에러 기록
-// ============================================================
-
 export function exampleRichErrorRecording(error: Error) {
   HyperDX.recordException(error, {
     // 앱 상태
@@ -106,7 +95,7 @@ export function exampleRichErrorRecording(error: Error) {
 }
 
 // ============================================================
-// 6. Custom Span (OTEL API 직접 사용)
+// 4. Custom Span (OTEL API 직접 사용)
 // ============================================================
 // HyperDX는 OTEL 기반이므로 OTEL API도 함께 사용 가능합니다.
 

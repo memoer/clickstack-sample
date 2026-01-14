@@ -15,7 +15,6 @@ export const recordException = (
   attributes?: Attributes | undefined
 ) => {
   HyperDX.recordException(err instanceof Error ? err : new Error(message), {
-    operation: "fetchTasks",
     ...attributes,
   });
 };

@@ -24,14 +24,14 @@ export function useTaskManager() {
   const handleRefreshTask = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // recordAction(`📡 Fetching tasks...`);
+    recordAction(`📡 Fetching tasks...`);
 
     try {
       const res = await fetch(apiPath);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       setTasks(data);
-      // recordAction(`✅ Fetched ${data.length} tasks`);
+      recordAction(`✅ Fetched ${data.length} tasks`);
     } catch (err) {
       captureError(err, { operation: "fetchTasks", database });
     } finally {
@@ -47,9 +47,9 @@ export function useTaskManager() {
     e.preventDefault();
     if (!newTask.title.trim()) return;
 
-    // recordAction(
-    //   `📝 Creating task in ${DB_LABELS[database]}: ${newTask.title}`
-    // );
+    recordAction(
+      `📝 Creating task in ${DB_LABELS[database]}: ${newTask.title}`
+    );
 
     try {
       const res = await fetch(apiPath, {
@@ -63,7 +63,7 @@ export function useTaskManager() {
       const task = await res.json();
       setTasks(prev => [...prev, task]);
       setNewTask({ title: "", description: "" });
-      // recordAction(`✅ Created task: ${task.id}`);
+      recordAction(`✅ Created task: ${task.id}`);
     } catch (err) {
       captureError(
         err instanceof Error ? err : new Error("Create task failed")
@@ -72,7 +72,7 @@ export function useTaskManager() {
   };
 
   const handleToggleTask = async (task: Task) => {
-    // recordAction(`🔄 Toggling task in ${DB_LABELS[database]}: ${task.id}`);
+    recordAction(`🔄 Toggling task in ${DB_LABELS[database]}: ${task.id}`);
 
     try {
       const res = await fetch(`${apiPath}/${task.id}`, {
@@ -85,21 +85,21 @@ export function useTaskManager() {
 
       const updated = await res.json();
       setTasks(prev => prev.map(t => (t.id === task.id ? updated : t)));
-      // recordAction(`✅ Task ${task.completed ? "uncompleted" : "completed"}`);
+      recordAction(`✅ Task ${task.completed ? "uncompleted" : "completed"}`);
     } catch (err) {
-      err instanceof Error ? err : new Error("Update task failed");
+      captureError(err, { operation: "toggleTask", database, taskId: task.id });
     }
   };
 
   const handleDeletingTask = async (id: string) => {
-    // recordAction(`🗑️ Deleting task from ${DB_LABELS[database]}: ${id}`);
+    recordAction(`🗑️ Deleting task from ${DB_LABELS[database]}: ${id}`);
 
     try {
       const res = await fetch(`${apiPath}/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete task");
 
       setTasks(prev => prev.filter(t => t.id !== id));
-      // recordAction(`✅ Deleted task: ${id}`);
+      recordAction(`✅ Deleted task: ${id}`);
     } catch (err) {
       captureError(
         err instanceof Error ? err : new Error("Delete task failed")
@@ -108,19 +108,19 @@ export function useTaskManager() {
   };
 
   const handleSlowOperation = async () => {
-    // recordAction("🐢 Starting slow operation...");
+    recordAction("🐢 Starting slow operation...");
 
     try {
       const res = await fetch(`${API_BASE}/tasks/slow`);
       const data = await res.json();
-      // recordAction(`✅ Slow operation completed in ${data.duration}ms`);
+      recordAction(`✅ Slow operation completed in ${data.duration}ms`);
     } catch (err) {
       captureError(err);
     }
   };
 
   const handleServerError = async () => {
-    // recordAction("💥 Triggering error...");
+    recordAction("💥 Triggering error...");
 
     try {
       const res = await fetch(`${API_BASE}/tasks/error`);
@@ -136,21 +136,21 @@ export function useTaskManager() {
   };
 
   const handleCheckingHealth = async () => {
-    // recordAction("🏥 Checking health...");
+    recordAction("🏥 Checking health...");
 
     try {
       const res = await fetch(`${API_BASE}/health`);
       const data = await res.json();
-      // recordAction(
-      //   `✅ Health: ${data.status}, Uptime: ${data.uptime.toFixed(2)}s`
-      // );
+      recordAction(
+        `✅ Health: ${data.status}, Uptime: ${data.uptime.toFixed(2)}s`
+      );
     } catch (err) {
       captureError(err);
     }
   };
 
   const handleFrontError = () => {
-    // recordAction("💥 Triggering frontend error...");
+    recordAction("💥 Triggering frontend error...");
     try {
       throw new Error("Intentional frontend error for testing session replay");
     } catch (err) {
@@ -164,11 +164,10 @@ export function useTaskManager() {
   const handleDatabaseChange = (db: DatabaseType) => {
     setDatabase(db);
     setTasks([]);
-    // recordAction(`🔀 Switched to ${DB_LABELS[db]}`);
+    recordAction(`🔀 Switched to ${DB_LABELS[db]}`);
   };
 
   return {
-    // State
     database,
     tasks,
     loading,
@@ -176,7 +175,6 @@ export function useTaskManager() {
     newTask,
     setNewTask,
 
-    // Handlers
     handleRefreshTask,
     handleCreatingTask,
     handleToggleTask,

@@ -9,6 +9,9 @@ const OTEL_ENDPOINT = import.meta.env.VITE_OTEL_ENDPOINT;
 // Only initialize if we have configuration
 if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
   HyperDX.init({
+    // Custom OTLP endpoint (for local ClickStack)
+    url: OTEL_ENDPOINT,
+
     // API Key from HyperDX UI -> Team Settings (optional for local dev)
     apiKey: HYPERDX_API_KEY,
 
@@ -23,9 +26,6 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
 
     // Advanced session replay settings
     advancedNetworkCapture: true,
-
-    // Custom OTLP endpoint (for local ClickStack)
-    url: OTEL_ENDPOINT,
   });
 
   // Identify user (optional - useful for tracking specific users)

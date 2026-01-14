@@ -1,12 +1,8 @@
-data/clickstack/clickhouse
-data/clickstack/log
-data/clickstack/mongodb
-data/mongodb
-data/postgres
-data/redis
+_mount
 backend/dist
 backend/node_modules
 backend/.env
 frontend/dist
 frontend/node_modules
 frontend/.env
+mobile/node_modules

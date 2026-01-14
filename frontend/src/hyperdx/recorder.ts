@@ -1,9 +1,12 @@
 import HyperDX from "@hyperdx/browser";
 import { Attributes } from "@opentelemetry/api";
 
-export const recordAction = (message: string) => {
+export const recordAction = (
+  message: string,
+  attrs?: Record<string, unknown>
+) => {
   const timestamp = new Date().toLocaleTimeString();
-  HyperDX.addAction(message, { timestamp });
+  HyperDX.addAction(message, { timestamp, ...attrs });
 };
 
 export const recordException = (
@@ -11,7 +14,6 @@ export const recordException = (
   message: string,
   attributes?: Attributes | undefined
 ) => {
-  recordAction(`${err}`);
   HyperDX.recordException(err instanceof Error ? err : new Error(message), {
     operation: "fetchTasks",
     ...attributes,

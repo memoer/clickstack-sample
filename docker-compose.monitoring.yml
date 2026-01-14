@@ -17,7 +17,7 @@ services:
       - "13133:13133" # Health check
       - "8888:8888"   # Collector metrics
     volumes:
-      - ./data/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./_mount/otel-collector/otel-collector-config.base.yaml:/etc/otel-collector-config.yaml:ro
     depends_on:
       clickstack:
         condition: service_healthy
@@ -48,9 +48,9 @@ services:
       - "4317"
       - "4318"
     volumes:
-      - ./data/clickstack/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
-      - ./data/clickstack/mongodb:/data/db                    # 사용자 계정, 대시보드, 알림 설정
-      - ./data/clickstack/log:/var/log                      # clickhouse, hyperdx 관련 로그
+      - ./_mount/clickstack/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
+      - ./_mount/clickstack/mongodb:/data/db                    # 사용자 계정, 대시보드, 알림 설정
+      - ./_mount/clickstack/log:/var/log                      # clickhouse, hyperdx 관련 로그
     healthcheck:
       # HyperDX doesn't have /health endpoint, check if UI is accessible
       test: ["CMD", "curl", "-sf", "http://localhost:8080/"]

@@ -19,7 +19,7 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
     tracePropagationTargets: [/localhost:3000/i, /api/i],
 
     // Console capture settings
-    consoleCapture: true,
+    consoleCapture: false,
 
     // Advanced session replay settings
     advancedNetworkCapture: true,

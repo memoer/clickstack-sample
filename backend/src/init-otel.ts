@@ -35,9 +35,9 @@ import {
 // ============================================================================
 
 const OTEL_EXPORTER_OTLP_ENDPOINT = process.env.OTEL_EXPORTER_OTLP_ENDPOINT; // OTLP 엔드포인트 (벤더 전환 시 이것만 변경!)
-const SERVICE_NAME = process.env.OTEL_SERVICE_NAME; // 서비스 정보
-const SERVICE_VERSION = process.env.SERVICE_VERSION; // 서비스 정보
-const DEPLOYMENT_ENV = process.env.NODE_ENV; // 서비스 정보
+const SERVICE_NAME = process.env.OTEL_SERVICE_NAME;
+const SERVICE_VERSION = process.env.SERVICE_VERSION;
+const DEPLOYMENT_ENV = process.env.NODE_ENV;
 const AUTH_HEADER = process.env.OTEL_EXPORTER_OTLP_HEADERS; // 인증 헤더 (선택사항 - 벤더에 따라 필요)
 
 const headers: Record<string, string> = {};
@@ -83,6 +83,7 @@ const sdk = new NodeSDK({
   resource: resourceFromAttributes({
     [ATTR_SERVICE_NAME]: SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: SERVICE_VERSION,
+    "deployment.environment.name": DEPLOYMENT_ENV,
     "service.env": DEPLOYMENT_ENV,
   }),
 
@@ -118,7 +119,7 @@ const sdk = new NodeSDK({
         // Skip tracing for OTLP exporter calls
         ignoreOutgoingRequestHook: request => {
           const host = request.hostname || request.host || "";
-          return host.includes("otel-collector"); // OTLP collector
+          return host.includes("otel-collector");
         },
       },
 

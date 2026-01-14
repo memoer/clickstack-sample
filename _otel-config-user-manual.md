@@ -344,7 +344,7 @@ exporters:
   otlphttp/clickstack:
     endpoint: http://clickstack:4318
     headers:
-      authorization: "2ce0b5fc-7ce2-4c48-82a9-6487c6a17a8e"
+      authorization: "6adecf01-7114-47a8-b1fe-bf0a9516a97d"
 ```
 
 | 설정 | 값 | 설명 |

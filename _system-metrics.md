@@ -115,7 +115,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.116.1
     volumes:
-      - ./data/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./_mount/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml
       # Add these for hostmetrics
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro

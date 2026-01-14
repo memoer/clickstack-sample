@@ -1,7 +1,7 @@
 // ⚠️ dotenv must be loaded FIRST, before any process.env access
 import "dotenv/config";
 // ⚠️ IMPORTANT: tracing must be imported FIRST, before any other imports!
-import "./tracing";
+import "./init-otel";
 
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";

@@ -6,8 +6,6 @@ import {
   HttpStatus,
 } from "@nestjs/common";
 import { Request, Response } from "express";
-import { trace, context } from "@opentelemetry/api";
-import { Logger } from "../logger";
 
 interface ErrorResponse {
   statusCode: number;
@@ -20,15 +18,12 @@ interface ErrorResponse {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
-
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
 
     const { status, message, error } = this.extractErrorInfo(exception);
-    const traceId = this.getTraceId();
 
     const errorResponse: ErrorResponse = {
       statusCode: status,
@@ -36,10 +31,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error,
       timestamp: new Date().toISOString(),
       path: request.url,
-      ...(traceId && { traceId }),
     };
-
-    this.logException(exception, status, request, traceId);
 
     response.status(status).json(errorResponse);
   }
@@ -77,39 +69,5 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           : "Internal server error",
       error: "Internal Server Error",
     };
-  }
-
-  private getTraceId(): string | undefined {
-    const span = trace.getSpan(context.active());
-    return span?.spanContext().traceId;
-  }
-
-  private logException(
-    exception: unknown,
-    status: number,
-    request: Request,
-    traceId?: string
-  ): void {
-    const logContext = {
-      statusCode: status,
-      method: request.method,
-      path: request.url,
-      ...(traceId && { traceId }),
-    };
-
-    if (status >= 500) {
-      this.logger.error(
-        {
-          ...logContext,
-          err: exception instanceof Error ? exception : undefined,
-        },
-        `[${status}] ${request.method} ${request.url}`
-      );
-    } else if (status >= 400) {
-      this.logger.warn(
-        logContext,
-        `[${status}] ${request.method} ${request.url}`
-      );
-    }
   }
 }

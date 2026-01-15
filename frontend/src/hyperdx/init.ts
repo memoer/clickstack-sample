@@ -22,10 +22,10 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
     tracePropagationTargets: [/localhost:3000/i, /api/i],
 
     // Console capture settings
-    consoleCapture: false,
+    consoleCapture: false, // dev, stage에서만 켜기?
 
     // Advanced session replay settings
-    advancedNetworkCapture: true,
+    advancedNetworkCapture: false, // dev, stage에서만 켜기?
   });
 
   // Identify user (optional - useful for tracking specific users)

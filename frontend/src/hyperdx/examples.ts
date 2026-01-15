@@ -95,13 +95,13 @@ export function exampleRichErrorRecording(error: Error) {
 }
 
 // ============================================================
-// 4. Custom Span (OTEL API 직접 사용)
+// 5. Custom Span (OTEL API 직접 사용)
 // ============================================================
 // HyperDX는 OTEL 기반이므로 OTEL API도 함께 사용 가능합니다.
 
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 
-export async function exampleCustomSpan<T>(
+export async function wrapForTrace<T>(
   operationName: string,
   fn: () => Promise<T>
 ): Promise<T> {
@@ -127,7 +127,7 @@ export async function exampleCustomSpan<T>(
 
 // 사용 예시
 export async function exampleUseCustomSpan() {
-  const result = await exampleCustomSpan("complex_calculation", async () => {
+  const result = await wrapForTrace("complex_calculation", async () => {
     // 무거운 작업 수행
     await new Promise(resolve => setTimeout(resolve, 100));
     return { calculated: true };
@@ -145,7 +145,7 @@ export async function exampleLoginFlow(email: string, password: string) {
 
   try {
     // 2. 커스텀 스팬으로 API 호출 추적
-    const user = await exampleCustomSpan("login_api_call", async () => {
+    const user = await wrapForTrace("login_api_call", async () => {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: exampleAttachSessionToRequest(),

@@ -88,16 +88,13 @@ FROM system.tables
 WHERE database IN ('default', 'otel');
 
 -- Traces: 7일 보관
-ALTER TABLE otel_traces
-MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
+ALTER TABLE otel_traces MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
 
 -- Logs: 30일 보관
-ALTER TABLE otel_logs
-MODIFY TTL toDateTime(Timestamp) + INTERVAL 30 DAY;
+ALTER TABLE otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 30 DAY;
 
 -- Metrics: 90일 보관
-ALTER TABLE otel_metrics_sum
-MODIFY TTL toDateTime(TimeUnix) + INTERVAL 90 DAY;
+ALTER TABLE otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 90 DAY;
 ```
 
 ### Recommended Retention by Signal

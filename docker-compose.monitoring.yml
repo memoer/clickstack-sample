@@ -17,7 +17,8 @@ services:
       - "13133:13133" # Health check
       - "8888:8888"   # Collector metrics
     volumes:
-      - ./_mount/otel-collector/otel-collector-config.base.yaml:/etc/otel-collector-config.yaml:ro
+      - ./_mount/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./_mount/otel-collector/logs:/var/log
     depends_on:
       clickstack:
         condition: service_healthy
@@ -41,16 +42,16 @@ services:
     image: docker.hyperdx.io/hyperdx/hyperdx-all-in-one
     ports:
       - "8080:8080"   # HyperDX UI
-      - "8123:8123"   # Clickhouse
-      - "9000:9000"   # ClickHouse native port
     # 내부 OTLP 포트는 otel-collector에서만 접근 (외부 노출 안함)
     expose:
       - "4317"
       - "4318"
+      - "9000"   # ClickHouse native port
+      - "8123"   # Clickhouse
     volumes:
       - ./_mount/clickstack/clickhouse:/var/lib/clickhouse    # 텔레메트리 데이터 (로그, 트레이스, 메트릭)
       - ./_mount/clickstack/mongodb:/data/db                    # 사용자 계정, 대시보드, 알림 설정
-      - ./_mount/clickstack/log:/var/log                      # clickhouse, hyperdx 관련 로그
+      - ./_mount/clickstack/logs:/var/log                      # clickhouse, hyperdx 관련 로그
     healthcheck:
       # HyperDX doesn't have /health endpoint, check if UI is accessible
       test: ["CMD", "curl", "-sf", "http://localhost:8080/"]

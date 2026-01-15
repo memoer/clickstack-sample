@@ -40,6 +40,9 @@ services:
   # ============================================================================
   clickstack:
     image: docker.hyperdx.io/hyperdx/hyperdx-all-in-one
+    # environment:  # use when launch this using cloud instance
+      # HYPERDX_APP_URL: http://43.203.246.139
+      # FRONTEND_URL: http://43.203.246.139:8080
     ports:
       - "8080:8080"   # HyperDX UI
     # 내부 OTLP 포트는 otel-collector에서만 접근 (외부 노출 안함)

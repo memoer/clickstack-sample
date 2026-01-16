@@ -1,13 +1,21 @@
-import { Controller, Get } from "@nestjs/common";
-import { Logger } from "./logger";
+import { Controller, Get, HttpException, HttpStatus } from "@nestjs/common";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 @Controller()
 export class AppController {
   private readonly tracer = trace.getTracer("app-controller");
-  private readonly logger = new Logger(AppController.name);
 
   constructor() {}
+
+  @Get("http")
+  http() {
+    throw new HttpException("test exception", HttpStatus.BAD_REQUEST);
+  }
+
+  @Get("error")
+  error() {
+    throw new Error("test error");
+  }
 
   @Get("health")
   getHealth() {

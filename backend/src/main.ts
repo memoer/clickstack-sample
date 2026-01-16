@@ -6,15 +6,21 @@ import "./init-otel";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { Logger } from "./logger";
-import { GlobalExceptionFilter } from "./filters/http-exception.filter";
+import { AllExceptionFilter } from "./filters/all-exception.filter";
 import { TracingInterceptor } from "./interceptors/tracing.interceptor";
+import { HttpExceptionFilter } from "./filters/http-exception.filter";
+import { ResponseInterceptor } from "./interceptors/response.interceptor";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
-  // Global Interceptor & Filter
-  app.useGlobalInterceptors(new TracingInterceptor());
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  // Tracing -> Response
+  app.useGlobalInterceptors(
+    new ResponseInterceptor(),
+    new TracingInterceptor()
+  );
+  // Http -> All
+  app.useGlobalFilters(new AllExceptionFilter(), new HttpExceptionFilter());
 
   // CORS 설정
   app.enableCors({

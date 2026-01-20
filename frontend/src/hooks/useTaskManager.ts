@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { DatabaseType } from "../types";
-import { API_BASE, DB_LABELS, DB_ROUTES } from "../constatns";
+import { TARGET_API_ENDPOINT, DB_LABELS, DB_ROUTES } from "../constants";
 import { recordAction } from "../hyperdx/recorder";
 import { recordError } from "./useError";
 
@@ -19,7 +19,7 @@ export function useTaskManager() {
   const [newTask, setNewTask] = useState({ title: "", description: "" });
   const { error, setError, captureError } = recordError();
 
-  const apiPath = `${API_BASE}${DB_ROUTES[database]}`;
+  const apiPath = `${TARGET_API_ENDPOINT}${DB_ROUTES[database]}`;
 
   const handleRefreshTask = useCallback(async () => {
     setLoading(true);
@@ -111,7 +111,7 @@ export function useTaskManager() {
     recordAction("🐢 Starting slow operation...");
 
     try {
-      const res = await fetch(`${API_BASE}/tasks/slow`);
+      const res = await fetch(`${TARGET_API_ENDPOINT}/tasks/slow`);
       const data = await res.json();
       recordAction(`✅ Slow operation completed in ${data.duration}ms`);
     } catch (err) {
@@ -123,7 +123,7 @@ export function useTaskManager() {
     recordAction("💥 Triggering error...");
 
     try {
-      const res = await fetch(`${API_BASE}/tasks/error`);
+      const res = await fetch(`${TARGET_API_ENDPOINT}/tasks/error`);
       if (!res.ok) {
         throw new Error(`Server error: ${res.status}`);
       }
@@ -139,7 +139,7 @@ export function useTaskManager() {
     recordAction("🏥 Checking health...");
 
     try {
-      const res = await fetch(`${API_BASE}/health`);
+      const res = await fetch(`${TARGET_API_ENDPOINT}/health`);
       const data = await res.json();
       recordAction(
         `✅ Health: ${data.status}, Uptime: ${data.uptime.toFixed(2)}s`

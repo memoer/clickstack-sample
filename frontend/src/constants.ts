@@ -1,6 +1,6 @@
 import { DatabaseType } from "./types";
 
-export const API_BASE = import.meta.env.VITE_API_URL;
+export const TARGET_API_ENDPOINT = "http://localhost:3000";
 
 export const DB_ROUTES: Record<DatabaseType, string> = {
   memory: "/tasks",

@@ -121,7 +121,7 @@ GROUP BY time
 ORDER BY time;
 ```
 
-### Retention Policy (TTL)
+## Retention Policy (TTL)
 
 ClickHouse TTL을 사용하여 오래된 데이터를 자동 삭제합니다:
 
@@ -130,13 +130,13 @@ ClickHouse TTL을 사용하여 오래된 데이터를 자동 삭제합니다:
 SELECT database, table, engine FROM system.tables WHERE database IN ('default', 'otel');
 
 -- Traces: 7일 보관
-ALTER TABLE otel_traces MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
+ALTER TABLE default.otel_traces MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
 
 -- Logs: 30일 보관
-ALTER TABLE otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 30 DAY;
+ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 30 DAY;
 
 -- Metrics: 90일 보관
-ALTER TABLE otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 30 DAY;
+ALTER TABLE default.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 30 DAY;
 ```
 
 ### Recommended Retention by Signal
@@ -148,7 +148,7 @@ ALTER TABLE otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 30 DAY;
 | **Logs (error)** | 30-90 days | 인시던트 분석에 중요 |
 | **Metrics** | 90-365 days | 저용량, 트렌드 분석에 가치 있음 |
 
-### The Way to Check TTL
+## The Way to Check TTL
 
 ```sql
 -- 모든 테이블의 TTL 설정 확인
@@ -192,4 +192,42 @@ OPTIMIZE TABLE <database>.<table_name> FINAL;
 
 > **Note**: ClickHouse TTL은 백그라운드 머지 중에 적용됩니다. 만료된 데이터가 즉시 삭제되지 않을 수 있습니다.
 
----
+## server settings
+
+```sql
+SELECT name, value, default, changed, description
+FROM system.server_settings
+WHERE name LIKE '%background%' OR name LIKE '%pool%'
+ORDER BY name;
+```
+
+┌───────────────────────────────┬─────────┬──────────────────────────────────────────┐
+│            Setting            │ Default │               Description                │
+├───────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ background_pool_size          │ 16      │ Threads for background merges            │
+├───────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ background_schedule_pool_size │ 128     │ Threads for scheduled tasks              │
+├───────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ background_fetches_pool_size  │ 8       │ Threads for fetching parts (replication) │
+├───────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ background_move_pool_size     │ 8       │ Threads for moving parts between disks   │
+├───────────────────────────────┼─────────┼──────────────────────────────────────────┤
+│ background_common_pool_size   │ 8       │ Common pool for misc operations          │
+└───────────────────────────────┴─────────┴──────────────────────────────────────────┘
+
+## merge tree settings
+
+```sql
+SELECT name, value, description
+FROM system.merge_tree_settings
+WHERE name LIKE '%background%' OR name LIKE '%merge%'
+LIMIT 20;
+```
+
+## System traces, logs, metrics
+
+```sql
+ALTER TABLE system.trace_log MODIFY TTL event_time + INTERVAL 1 DAY
+ALTER TABLE system.metric_log MODIFY TTL event_time + INTERVAL 1 DAY
+ALTER TABLE system.query_log MODIFY TTL event_time + INTERVAL 3 DAY
+```

@@ -3,8 +3,14 @@ import HyperDX from "@hyperdx/browser";
 // Initialize HyperDX for Session Replay, Browser Logs, and Frontend Tracing
 // This sends data to your local ClickStack instance
 
-const HYPERDX_API_KEY = import.meta.env.VITE_HYPERDX_API_KEY;
-const OTEL_ENDPOINT = import.meta.env.VITE_OTEL_ENDPOINT;
+const HYPERDX_API_KEY = "6adecf01-7114-47a8-b1fe-bf0a9516a97d";
+const OTEL_ENDPOINT = "http://localhost:4318";
+const SERVICE_NAME = "clickstack-demo-frontend";
+
+console.log("hyperdx init");
+console.log(HYPERDX_API_KEY);
+console.log(OTEL_ENDPOINT);
+console.log(SERVICE_NAME);
 
 // Only initialize if we have configuration
 if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
@@ -16,7 +22,7 @@ if (HYPERDX_API_KEY && OTEL_ENDPOINT) {
     apiKey: HYPERDX_API_KEY,
 
     // Service name for this frontend app
-    service: import.meta.env.VITE_SERVICE_NAME,
+    service: SERVICE_NAME,
 
     // Enable session recording (captures user interactions)
     tracePropagationTargets: [/localhost:3000/i, /api/i],

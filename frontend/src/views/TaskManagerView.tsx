@@ -1,4 +1,4 @@
-import { DB_LABELS } from "../constatns";
+import { DB_LABELS } from "../constants";
 import { DatabaseType } from "../types";
 import { Task } from "../hooks/useTaskManager";
 

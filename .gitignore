@@ -1,3 +1,4 @@
+.DS_store
 _mount
 backend/dist
 backend/node_modules

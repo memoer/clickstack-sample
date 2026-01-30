@@ -1,0 +1,7 @@
+<clickhouse>
+    <users>
+        <api>
+            <password>your_new_password</password>
+        </api>
+    </users>
+</clickhouse>

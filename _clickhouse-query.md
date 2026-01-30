@@ -127,15 +127,10 @@ ClickHouse TTL을 사용하여 오래된 데이터를 자동 삭제합니다:
 
 ```sql
 -- 현재 테이블 확인
-SELECT database, table, engine FROM system.tables WHERE database IN ('default', 'otel');
+SELECT database, table, engine FROM system.tables WHERE database IN ('default', 'otel', 'system');
 
--- Traces: 7일 보관
 ALTER TABLE default.otel_traces MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
-
--- Logs: 30일 보관
-ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 30 DAY;
-
--- Metrics: 90일 보관
+ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 15 DAY;
 ALTER TABLE default.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 30 DAY;
 ```
 
@@ -159,7 +154,7 @@ SELECT
     partition_key,
     sorting_key
 FROM system.tables
-WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema');
+WHERE database NOT IN ('INFORMATION_SCHEMA', 'information_schema');
 ```
 
 ```sql
@@ -169,8 +164,7 @@ SELECT
     name AS table,
     engine_full
 FROM system.tables
-WHERE database NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
-  AND engine_full LIKE '%TTL%';
+WHERE database NOT IN ('INFORMATION_SCHEMA', 'information_schema') AND engine_full LIKE '%TTL%';
 ```
 
 ```sql
@@ -227,7 +221,7 @@ LIMIT 20;
 ## System traces, logs, metrics
 
 ```sql
-ALTER TABLE system.trace_log MODIFY TTL event_time + INTERVAL 1 DAY
-ALTER TABLE system.metric_log MODIFY TTL event_time + INTERVAL 1 DAY
-ALTER TABLE system.query_log MODIFY TTL event_time + INTERVAL 3 DAY
+ALTER TABLE system.trace_log MODIFY TTL event_time + INTERVAL 1 DAY;
+ALTER TABLE system.metric_log MODIFY TTL event_time + INTERVAL 1 DAY;
+ALTER TABLE system.query_log MODIFY TTL event_time + INTERVAL 1 DAY;
 ```

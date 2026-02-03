@@ -1,0 +1,28 @@
+<clickhouse>
+    <query_log replace="true">
+        <database>system</database>
+        <table>query_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <engine>
+            engine MergeTree
+            partition by toDate(event_date)
+            order by (event_date, event_time_microseconds)
+            ttl event_time + toIntervalDay(1)
+            settings ttl_only_drop_parts = 1
+        </engine>
+    </query_log>
+
+    <metric_log replace="true">
+        <database>system</database>
+        <table>metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <collect_interval_milliseconds>1000</collect_interval_milliseconds>
+        <engine>
+            engine MergeTree
+            partition by toDate(event_date)
+            order by (event_date, event_time)
+            ttl event_time + toIntervalDay(1)
+            settings ttl_only_drop_parts = 1
+        </engine>
+    </metric_log>
+</clickhouse>

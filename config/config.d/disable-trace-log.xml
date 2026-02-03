@@ -1,0 +1,6 @@
+<clickhouse>
+    <trace_log remove="remove"/>
+    <metric_log>
+        <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+    </metric_log>
+</clickhouse>

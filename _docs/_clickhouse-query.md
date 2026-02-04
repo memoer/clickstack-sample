@@ -200,6 +200,16 @@ FROM system.parts
 WHERE active AND database='default' AND table='otel_traces'
 GROUP BY partition
 ORDER BY partition
+
+-- 백그라운드 풀 사이즈 확인
+SELECT name, value, changed
+FROM system.settings
+WHERE name LIKE '%background%'
+
+--  메모리 설정 확인
+SELECT name, default, value
+FROM system.server_settings
+WHERE name IN ('max_server_memory_usage', 'max_server_memory_usage_to_ram_ratio')
 ```
 
 

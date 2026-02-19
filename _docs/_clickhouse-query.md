@@ -96,8 +96,12 @@ ORDER BY time;
 
 ```sql
 ALTER TABLE default.otel_traces MODIFY TTL toDateTime(Timestamp) + INTERVAL 7 DAY;
-ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 15 DAY;
-ALTER TABLE default.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 30 DAY;
+ALTER TABLE default.otel_logs MODIFY TTL toDateTime(Timestamp) + INTERVAL 14 DAY;
+ALTER TABLE default.otel_metrics_exponential_histogram MODIFY TTL toDateTime(TimeUnix) + INTERVAL 28 DAY;
+ALTER TABLE default.otel_metrics_gauge MODIFY TTL toDateTime(TimeUnix) + INTERVAL 28 DAY;
+ALTER TABLE default.otel_metrics_histogram MODIFY TTL toDateTime(TimeUnix) + INTERVAL 28 DAY;
+ALTER TABLE default.otel_metrics_sum MODIFY TTL toDateTime(TimeUnix) + INTERVAL 28 DAY;
+ALTER TABLE default.otel_metrics_summary MODIFY TTL toDateTime(TimeUnix) + INTERVAL 28 DAY;
 ALTER TABLE system.trace_log MODIFY TTL event_time + INTERVAL 1 DAY;
 ALTER TABLE system.metric_log MODIFY TTL event_time + INTERVAL 1 DAY;
 ALTER TABLE system.query_log MODIFY TTL event_time + INTERVAL 1 DAY;
